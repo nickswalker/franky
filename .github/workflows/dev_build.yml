@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - dev
+      - fork-dev
   workflow_dispatch:
 
 concurrency:
@@ -63,15 +64,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$GITHUB_REF_NAME" = master ]; then
-            release_tag=dev-release
-            release_title="Development (stable)"
-            index_path=whl
-          else
-            release_tag=unstable-release
-            release_title="Development (unstable)"
-            index_path="branches/${GITHUB_REF_NAME}/whl"
-          fi
+          case "$GITHUB_REF_NAME" in
+            master)
+              release_tag=dev-release
+              release_title="Development (stable)"
+              index_path=whl
+              ;;
+            dev)
+              release_tag=unstable-release
+              release_title="Development (unstable)"
+              index_path="branches/dev/whl"
+              ;;
+            *)
+              release_tag="${GITHUB_REF_NAME}-release"
+              release_title="Development (${GITHUB_REF_NAME})"
+              index_path="branches/${GITHUB_REF_NAME}/whl"
+              ;;
+          esac
           IFS=. read -r major minor patch < VERSION
           wheel_version="${major}.${minor}.$((patch + 1)).dev${{ needs.get-build-info.outputs.build-number }}+g${{ needs.get-build-info.outputs.commit-hash }}"
           pages_url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
