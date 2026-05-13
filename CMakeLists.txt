@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.11)
 
 file(READ "VERSION" version)
 string(STRIP "${version}" version)
-project(franky VERSION "${version}" LANGUAGES CXX)
+# Strip PEP 440 local-version label (e.g. "+impedance.libfranka.0.7.1") —
+# CMake's project(VERSION) only accepts numeric major[.minor[.patch[.tweak]]].
+string(REGEX REPLACE "\\+.*$" "" cmake_version "${version}")
+project(franky VERSION "${cmake_version}" LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
