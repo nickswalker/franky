@@ -25,9 +25,7 @@ def _user_config_home() -> str:
     return os.path.expanduser("~/.config")
 
 
-TOKEN_STORAGE_PATH = os.path.join(
-    _user_config_home(), "franky", "control_tokens.conf"
-)
+TOKEN_STORAGE_PATH = os.path.join(_user_config_home(), "franky", "control_tokens.conf")
 
 
 class RobotWebSessionError(Exception):
@@ -139,7 +137,7 @@ class _ControlTokenStore:
 
 
 def _make_control_token_store(
-    token_storage: Union[bool, str, os.PathLike]
+    token_storage: Union[bool, str, os.PathLike],
 ) -> Optional[_ControlTokenStore]:
     if token_storage is False:
         return None
