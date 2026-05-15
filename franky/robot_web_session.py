@@ -1,19 +1,33 @@
 import base64
+import configparser
 import hashlib
 import http.client
 import json
 import logging
+import os
 import ssl
 import time
 import urllib.parse
 from dataclasses import dataclass
 from enum import Enum
 from http.client import HTTPSConnection, HTTPResponse
-from typing import Dict, Optional, Any, Literal, List
+from typing import Dict, Optional, Any, Literal, List, Union
 
 import websockets.sync.client as ws_sync
 
 logger = logging.getLogger(__name__)
+
+
+def _user_config_home() -> str:
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    if config_home and os.path.isabs(config_home):
+        return config_home
+    return os.path.expanduser("~/.config")
+
+
+TOKEN_STORAGE_PATH = os.path.join(
+    _user_config_home(), "franky", "control_tokens.conf"
+)
 
 
 class RobotWebSessionError(Exception):
@@ -64,6 +78,114 @@ class PilotButtonEvent:
     def __repr__(self) -> str:
         action = "pressed" if self.pressed else "released"
         return f"PilotButtonEvent({self.button.value} {action})"
+
+
+@dataclass(frozen=True)
+class _ControlToken:
+    id: str
+    token: str
+
+
+class _ControlTokenStore:
+    def __init__(self, path: str):
+        self._path = os.path.expanduser(path)
+
+    def _section(self, api: str, hostname: str, username: str) -> str:
+        return f"{api}:{hostname}:{username}"
+
+    def _write(self, config: configparser.ConfigParser) -> None:
+        directory = os.path.dirname(self._path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as config_file:
+            config.write(config_file)
+        os.chmod(self._path, 0o600)
+
+    def load(self, api: str, hostname: str, username: str) -> Optional[_ControlToken]:
+        config = configparser.ConfigParser()
+        if not os.path.exists(self._path):
+            return None
+        config.read(self._path)
+        section = self._section(api, hostname, username)
+        if not config.has_section(section):
+            return None
+        token_id = config.get(section, "id", fallback="")
+        token = config.get(section, "token", fallback="")
+        if not token_id or not token:
+            return None
+        return _ControlToken(id=token_id, token=token)
+
+    def save(
+        self, api: str, hostname: str, username: str, control_token: _ControlToken
+    ) -> None:
+        config = configparser.ConfigParser()
+        if os.path.exists(self._path):
+            config.read(self._path)
+        config[self._section(api, hostname, username)] = {
+            "id": control_token.id,
+            "token": control_token.token,
+        }
+        self._write(config)
+
+    def delete(self, api: str, hostname: str, username: str) -> None:
+        if not os.path.exists(self._path):
+            return
+        config = configparser.ConfigParser()
+        config.read(self._path)
+        if not config.remove_section(self._section(api, hostname, username)):
+            return
+        self._write(config)
+
+
+def _make_control_token_store(
+    token_storage: Union[bool, str, os.PathLike]
+) -> Optional[_ControlTokenStore]:
+    if token_storage is False:
+        return None
+    if token_storage is True:
+        return _ControlTokenStore(TOKEN_STORAGE_PATH)
+    return _ControlTokenStore(os.fspath(token_storage))
+
+
+def _load_control_token(
+    token_store: Optional[_ControlTokenStore],
+    api: str,
+    hostname: str,
+    username: str,
+) -> Optional[_ControlToken]:
+    if token_store is None:
+        return None
+    return token_store.load(api, hostname, username)
+
+
+def _save_control_token(
+    token_store: Optional[_ControlTokenStore],
+    api: str,
+    hostname: str,
+    username: str,
+    control_token_id: Optional[str],
+    control_token: Optional[str],
+) -> None:
+    if token_store is None or control_token_id is None or control_token is None:
+        return
+    token_store.save(
+        api,
+        hostname,
+        username,
+        _ControlToken(id=str(control_token_id), token=control_token),
+    )
+
+
+def _delete_control_token(
+    token_store: Optional[_ControlTokenStore],
+    api: str,
+    hostname: str,
+    username: str,
+) -> None:
+    if token_store is None:
+        return
+    token_store.delete(api, hostname, username)
 
 
 def _encode_password(user: str, password: str) -> str:
@@ -179,16 +301,28 @@ class RobotWebSession(_PilotMixin):
     firmware, use :class:`Desk` instead.
     """
 
-    def __init__(self, hostname: str, username: str, password: str):
+    _TOKEN_STORE_API = "legacy"
+
+    def __init__(
+        self,
+        hostname: str,
+        username: str,
+        password: str,
+        token_storage: Union[bool, str, os.PathLike] = False,
+    ):
         super().__init__()
         self._hostname = hostname
         self.__username = username
         self.__password = password
+        self.__token_store = _make_control_token_store(token_storage)
 
         self.__client = None
         self.__token = None
-        self.__control_token = None
-        self.__control_token_id = None
+        stored_token = _load_control_token(
+            self.__token_store, self._TOKEN_STORE_API, self._hostname, self.__username
+        )
+        self.__control_token = stored_token.token if stored_token is not None else None
+        self.__control_token_id = stored_token.id if stored_token is not None else None
 
     def _pilot_auth_headers(self) -> Dict[str, str]:
         return {"authorization": self.__token}
@@ -267,12 +401,24 @@ class RobotWebSession(_PilotMixin):
     def close(self):
         if not self.is_open:
             raise RuntimeError("Session is not open.")
-        self._close_pilot_button_socket()
-        if self.__control_token is not None:
-            self.release_control()
-        self.__token = None
-        self.__client.close()
-        self.__client = None
+        try:
+            self._close_pilot_button_socket()
+            if self.__control_token is not None:
+                if self.has_control():
+                    self.release_control()
+                else:
+                    self.__control_token = None
+                    self.__control_token_id = None
+                    _delete_control_token(
+                        self.__token_store,
+                        self._TOKEN_STORE_API,
+                        self._hostname,
+                        self.__username,
+                    )
+        finally:
+            self.__token = None
+            self.__client.close()
+            self.__client = None
 
     def __enter__(self):
         return self.open()
@@ -300,7 +446,7 @@ class RobotWebSession(_PilotMixin):
                 )
             response_dict = json.loads(res)
             self.__control_token = response_dict["token"]
-            self.__control_token_id = response_dict["id"]
+            self.__control_token_id = str(response_dict["id"])
             # One should probably use websockets here but that would introduce another dependency
             start = time.time()
             has_control = self.has_control()
@@ -311,6 +457,14 @@ class RobotWebSession(_PilotMixin):
                 raise TakeControlTimeoutError(
                     f"Timed out waiting for control to be granted after {wait_timeout}s."
                 )
+            _save_control_token(
+                self.__token_store,
+                self._TOKEN_STORE_API,
+                self._hostname,
+                self.__username,
+                self.__control_token_id,
+                self.__control_token,
+            )
 
     def release_control(self):
         if self.__control_token is not None:
@@ -322,6 +476,12 @@ class RobotWebSession(_PilotMixin):
             )
             self.__control_token = None
             self.__control_token_id = None
+            _delete_control_token(
+                self.__token_store,
+                self._TOKEN_STORE_API,
+                self._hostname,
+                self.__username,
+            )
 
     def enable_fci(self):
         self.send_control_api_request(
@@ -336,7 +496,7 @@ class RobotWebSession(_PilotMixin):
             active_token = status["controlToken"]["activeToken"]
             return (
                 active_token is not None
-                and active_token["id"] == self.__control_token_id
+                and str(active_token["id"]) == self.__control_token_id
             )
         return False
 
@@ -416,14 +576,26 @@ class Desk(_PilotMixin):
     on System 5+ firmware. For older firmware, use :class:`RobotWebSession`.
     """
 
-    def __init__(self, hostname: str, username: str, password: str):
+    _TOKEN_STORE_API = "v1"
+
+    def __init__(
+        self,
+        hostname: str,
+        username: str,
+        password: str,
+        token_storage: Union[bool, str, os.PathLike] = False,
+    ):
         super().__init__()
         self._hostname = hostname
         self.__username = username
         self.__basic = base64.b64encode(f"{username}:{password}".encode()).decode()
+        self.__token_store = _make_control_token_store(token_storage)
         self.__client: Optional[HTTPSConnection] = None
-        self.__control_token: Optional[str] = None
-        self.__control_token_id: Optional[int] = None
+        stored_token = _load_control_token(
+            self.__token_store, self._TOKEN_STORE_API, self._hostname, self.__username
+        )
+        self.__control_token = stored_token.token if stored_token is not None else None
+        self.__control_token_id = stored_token.id if stored_token is not None else None
 
     def _pilot_auth_headers(self) -> Dict[str, str]:
         return {"Authorization": f"Basic {self.__basic}"}
@@ -484,11 +656,23 @@ class Desk(_PilotMixin):
     def close(self):
         if not self.is_open:
             raise RuntimeError("Session is not open.")
-        self._close_pilot_button_socket()
-        if self.__control_token is not None:
-            self.release_control()
-        self.__client.close()
-        self.__client = None
+        try:
+            self._close_pilot_button_socket()
+            if self.__control_token is not None:
+                if self.has_control():
+                    self.release_control()
+                else:
+                    self.__control_token = None
+                    self.__control_token_id = None
+                    _delete_control_token(
+                        self.__token_store,
+                        self._TOKEN_STORE_API,
+                        self._hostname,
+                        self.__username,
+                    )
+        finally:
+            self.__client.close()
+            self.__client = None
 
     def __enter__(self):
         return self.open()
@@ -516,7 +700,15 @@ class Desk(_PilotMixin):
             )
         )
         self.__control_token = res["token"]
-        self.__control_token_id = res["tokenId"]
+        self.__control_token_id = str(res["tokenId"])
+        _save_control_token(
+            self.__token_store,
+            self._TOKEN_STORE_API,
+            self._hostname,
+            self.__username,
+            self.__control_token_id,
+            self.__control_token,
+        )
 
     def release_control(self):
         if self.__control_token is None:
@@ -524,12 +716,18 @@ class Desk(_PilotMixin):
         self._request("POST", "/api/system/control-token:release", control_token=True)
         self.__control_token = None
         self.__control_token_id = None
+        _delete_control_token(
+            self.__token_store,
+            self._TOKEN_STORE_API,
+            self._hostname,
+            self.__username,
+        )
 
     def has_control(self) -> bool:
         if self.__control_token_id is None:
             return False
         data = json.loads(self._request("GET", "/api/system/control-token"))
-        return data.get("tokenId") == self.__control_token_id
+        return str(data.get("tokenId")) == self.__control_token_id
 
     def unlock_brakes(self):
         self._request("POST", "/api/arm/joints:unlock", control_token=True)
