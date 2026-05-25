@@ -4,7 +4,6 @@ import numpy as np
 
 from franky import Affine, CartesianImpedanceTracker, Robot, Twist
 
-
 def get_joint_limits(robot: Robot):
     if "fr3" in robot.model_urdf.lower():
         return (
