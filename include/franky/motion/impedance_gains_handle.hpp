@@ -22,7 +22,6 @@ inline Vector7d defaultJointImpedanceDamping() {
 struct CartesianImpedanceGains {
   double translational_stiffness{2000.0};
   double rotational_stiffness{200.0};
-  double nullspace_stiffness{0.0};
 };
 
 /**
