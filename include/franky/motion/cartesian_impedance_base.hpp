@@ -94,6 +94,17 @@ struct ManipulabilityTask {
 using NullspaceTask = std::variant<PostureTask, ManipulabilityTask>;
 
 /**
+ * @brief Cartesian impedance dynamics formulation.
+ */
+enum class CartesianImpedanceDynamicsMode {
+  /** Direct Cartesian wrench spring-damper: tau = J^T F. */
+  kWrench,
+
+  /** Operational-space inertia decoupling: tau = J^T Lambda xdd_cmd. */
+  kOperationalSpace,
+};
+
+/**
  * @brief Base class for client-side cartesian impedance motions.
  *
  * This motion is implements a cartesian impedance controller on the client
@@ -131,6 +142,9 @@ class CartesianImpedanceBase : public Motion<franka::Torques> {
 
     /** Per-axis force/torque constraints [N, Nm]. nullopt on an axis means unconstrained. */
     std::array<std::optional<double>, 6> force_constraints{};
+
+    /** Cartesian task dynamics formulation. */
+    CartesianImpedanceDynamicsMode dynamics_mode{CartesianImpedanceDynamicsMode::kWrench};
 
     /**
      * Nullspace objectives.

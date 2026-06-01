@@ -341,6 +341,7 @@ If target_acceleration is provided, it is interpreted as the desired end-effecto
       .def_readwrite("translational_error_clip", &CartesianImpedanceBase::Params::translational_error_clip)
       .def_readwrite("rotational_error_clip", &CartesianImpedanceBase::Params::rotational_error_clip)
       .def_readwrite("force_constraints", &CartesianImpedanceBase::Params::force_constraints)
+      .def_readwrite("dynamics_mode", &CartesianImpedanceBase::Params::dynamics_mode)
       .def_readwrite("nullspace_tasks", &CartesianImpedanceBase::Params::nullspace_tasks)
       .def_readwrite("safety", &CartesianImpedanceBase::Params::safety)
       .def_readwrite("friction", &CartesianImpedanceBase::Params::friction);

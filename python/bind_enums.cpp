@@ -26,6 +26,10 @@ void bind_enums(py::module &m) {
       .value("CartesianVelocities", ControlSignalType::CartesianVelocities)
       .value("CartesianPose", ControlSignalType::CartesianPose);
 
+  py::enum_<CartesianImpedanceDynamicsMode>(m, "CartesianImpedanceDynamicsMode")
+      .value("Wrench", CartesianImpedanceDynamicsMode::kWrench)
+      .value("OperationalSpace", CartesianImpedanceDynamicsMode::kOperationalSpace);
+
   py::enum_<franka::RobotMode>(m, "RobotMode")
       .value("Other", franka::RobotMode::kOther)
       .value("Idle", franka::RobotMode::kIdle)

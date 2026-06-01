@@ -18,16 +18,20 @@ namespace franky {
 
 namespace {
 
-Eigen::Matrix<double, 6, 6> computeTaskSpaceInertia(const Jacobian &jacobian, const Eigen::Matrix<double, 7, 7> &mass) {
-  const Eigen::Matrix<double, 7, 6> mass_inv_jacobian_transpose = mass.ldlt().solve(jacobian.transpose());
-  const Eigen::Matrix<double, 6, 6> task_mass_inv = jacobian * mass_inv_jacobian_transpose;
-  Eigen::JacobiSVD<Eigen::Matrix<double, 6, 6>> svd(task_mass_inv, Eigen::ComputeFullU | Eigen::ComputeFullV);
+// Returns {Lambda, M_inv_JT} where Lambda = (J M^{-1} J^T)^{-1} is the 6x6 task-space inertia
+// matrix and M_inv_JT = M^{-1} J^T is kept for reuse in the dynamically consistent nullspace
+// projector N = I - M_inv_JT * Lambda * J. SVD handles kinematic singularities gracefully.
+std::pair<Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 7, 6>> computeTaskSpaceInertia(
+    const Jacobian &jacobian, const Eigen::Matrix<double, 7, 7> &M) {
+  const Eigen::Matrix<double, 7, 6> M_inv_JT = M.ldlt().solve(jacobian.transpose());
+  const Eigen::Matrix<double, 6, 6> J_Minv_JT = jacobian * M_inv_JT;
+  Eigen::JacobiSVD<Eigen::Matrix<double, 6, 6>> svd(J_Minv_JT, Eigen::ComputeFullU | Eigen::ComputeFullV);
   Eigen::Matrix<double, 6, 6> sigma_inv = Eigen::Matrix<double, 6, 6>::Zero();
   constexpr double tolerance = 1e-6;
   for (int i = 0; i < 6; ++i) {
     if (svd.singularValues()[i] > tolerance) sigma_inv(i, i) = 1.0 / svd.singularValues()[i];
   }
-  return svd.matrixV() * sigma_inv * svd.matrixU().transpose();
+  return {svd.matrixV() * sigma_inv * svd.matrixU().transpose(), M_inv_JT};
 }
 
 Eigen::Matrix<double, 6, 7> pseudoInverse(const Eigen::Matrix<double, 7, 6> &matrix) {
@@ -190,10 +194,22 @@ franka::Torques CartesianImpedanceBase::nextCommandImpl(
       reference.target_twist.has_value() ? reference.target_twist->vector_repr() : Vector6d::Zero();
   const Vector6d measured_twist = jacobian * robot_state.dq;
 
-  Vector6d wrench_cartesian = -stiffness * error - damping * (measured_twist - desired_twist);
-  if (reference.target_acceleration.has_value()) {
-    const Eigen::Matrix<double, 7, 7> mass = model->mass(robot_state);
-    const Eigen::Matrix<double, 6, 6> lambda = computeTaskSpaceInertia(jacobian, mass);
+  const Vector6d cartesian_feedback = -stiffness * error - damping * (measured_twist - desired_twist);
+  Vector6d wrench_cartesian = cartesian_feedback;
+  Eigen::Matrix<double, 6, 6> lambda = Eigen::Matrix<double, 6, 6>::Zero();
+  Eigen::Matrix<double, 7, 6> M_inv_JT = Eigen::Matrix<double, 7, 6>::Zero();
+  bool has_task_space_inertia = false;
+  if (params_.dynamics_mode == CartesianImpedanceDynamicsMode::kOperationalSpace) {
+    const Eigen::Matrix<double, 7, 7> M = model->mass(robot_state);
+    std::tie(lambda, M_inv_JT) = computeTaskSpaceInertia(jacobian, M);
+    has_task_space_inertia = true;
+    wrench_cartesian = lambda * (cartesian_feedback + (reference.target_acceleration.has_value()
+                                                           ? reference.target_acceleration->vector_repr()
+                                                           : Vector6d::Zero()));
+  } else if (reference.target_acceleration.has_value()) {
+    const Eigen::Matrix<double, 7, 7> M = model->mass(robot_state);
+    std::tie(lambda, M_inv_JT) = computeTaskSpaceInertia(jacobian, M);
+    has_task_space_inertia = true;
     wrench_cartesian += lambda * reference.target_acceleration->vector_repr();
   }
   for (int i = 0; i < 6; ++i) {
@@ -203,9 +219,18 @@ franka::Torques CartesianImpedanceBase::nextCommandImpl(
   auto tau_task = jacobian.transpose() * wrench_cartesian;
   Vector7d tau_nullspace = Vector7d::Zero();
   if (!params_.nullspace_tasks.empty()) {
-    const auto jacobian_transpose_pinv = pseudoInverse(jacobian.transpose());
-    const auto nullspace_projector =
-        Eigen::Matrix<double, 7, 7>::Identity() - jacobian.transpose() * jacobian_transpose_pinv;
+    Eigen::Matrix<double, 7, 7> nullspace_projector;
+    if (params_.dynamics_mode == CartesianImpedanceDynamicsMode::kOperationalSpace) {
+      if (!has_task_space_inertia) {
+        const Eigen::Matrix<double, 7, 7> M = model->mass(robot_state);
+        std::tie(lambda, M_inv_JT) = computeTaskSpaceInertia(jacobian, M);
+        has_task_space_inertia = true;
+      }
+      nullspace_projector = Eigen::Matrix<double, 7, 7>::Identity() - M_inv_JT * lambda * jacobian;
+    } else {
+      const auto jacobian_transpose_pinv = pseudoInverse(jacobian.transpose());
+      nullspace_projector = Eigen::Matrix<double, 7, 7>::Identity() - jacobian.transpose() * jacobian_transpose_pinv;
+    }
     Vector7d tau_nullspace_unprojected = Vector7d::Zero();
     for (const auto &task : params_.nullspace_tasks) {
       tau_nullspace_unprojected += std::visit(
@@ -219,7 +244,11 @@ franka::Torques CartesianImpedanceBase::nextCommandImpl(
           },
           task);
     }
-    tau_nullspace = nullspace_projector.transpose() * tau_nullspace_unprojected;
+    if (params_.dynamics_mode == CartesianImpedanceDynamicsMode::kOperationalSpace) {
+      tau_nullspace = nullspace_projector.transpose() * tau_nullspace_unprojected;
+    } else {
+      tau_nullspace = nullspace_projector * tau_nullspace_unprojected;
+    }
   }
 
   Vector7d tau_limit = Vector7d::Zero();
