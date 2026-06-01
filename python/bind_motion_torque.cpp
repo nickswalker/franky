@@ -50,6 +50,30 @@ void validateFrictionCompensationParams(const FrictionCompensationParams &fricti
   }
 }
 
+void validateFinite(double value, const char *name) {
+  if (!std::isfinite(value)) throw py::value_error(std::string(name) + " must be finite");
+}
+
+void validateNonNegativeFinite(double value, const char *name) {
+  validateFinite(value, name);
+  if (value < 0.0) throw py::value_error(std::string(name) + " must be non-negative");
+}
+
+std::vector<NullspaceTask> toNullspaceTasks(const py::object &object) {
+  std::vector<NullspaceTask> tasks;
+  if (object.is_none()) return tasks;
+  for (const auto item : object) {
+    if (py::isinstance<PostureTask>(item)) {
+      tasks.emplace_back(item.cast<PostureTask>());
+    } else if (py::isinstance<ManipulabilityTask>(item)) {
+      tasks.emplace_back(item.cast<ManipulabilityTask>());
+    } else {
+      throw py::type_error("nullspace_tasks must contain only PostureTask or ManipulabilityTask instances");
+    }
+  }
+  return tasks;
+}
+
 JointImpedanceParams makeJointImpedanceParams(
     const std::optional<Vector7d> &stiffness, const std::optional<Vector7d> &damping,
     const std::optional<Vector7d> &constant_torque_offset, const std::optional<Vector7d> &lower_joint_limits,
@@ -98,19 +122,17 @@ JointImpedanceParams makeJointImpedanceParams(
 
 CartesianImpedanceBase::Params makeCartesianImpedanceParams(
     double translational_stiffness, double rotational_stiffness,
-    const std::optional<std::array<std::optional<double>, 6>> &force_constraints,
-    const std::optional<Vector7d> &nullspace_target, double nullspace_stiffness, double max_delta_tau,
+    const std::optional<std::array<std::optional<double>, 6>> &force_constraints, double max_delta_tau,
     const std::optional<Vector7d> &lower_joint_limits, const std::optional<Vector7d> &upper_joint_limits,
     double joint_limit_activation_distance, double joint_limit_stiffness, double joint_limit_damping,
     double joint_limit_max_torque, const Eigen::Vector3d &translational_error_clip,
-    const Eigen::Vector3d &rotational_error_clip, const std::optional<FrictionCompensationParams> &friction) {
+    const Eigen::Vector3d &rotational_error_clip, const std::vector<NullspaceTask> &nullspace_tasks,
+    const std::optional<FrictionCompensationParams> &friction) {
   auto params = CartesianImpedanceBase::Params{};
   params.translational_stiffness = translational_stiffness;
   params.rotational_stiffness = rotational_stiffness;
   params.translational_error_clip = translational_error_clip;
   params.rotational_error_clip = rotational_error_clip;
-  params.nullspace_target = nullspace_target;
-  params.nullspace_stiffness = nullspace_stiffness;
   params.safety.max_delta_tau = max_delta_tau;
   params.safety.joint_limit_activation_distance = joint_limit_activation_distance;
   params.safety.joint_limit_stiffness = joint_limit_stiffness;
@@ -118,6 +140,7 @@ CartesianImpedanceBase::Params makeCartesianImpedanceParams(
   params.safety.joint_limit_max_torque = joint_limit_max_torque;
   params.safety.lower_joint_limits = lower_joint_limits;
   params.safety.upper_joint_limits = upper_joint_limits;
+  params.nullspace_tasks = nullspace_tasks;
   if (force_constraints.has_value()) params.force_constraints = force_constraints.value();
   if (friction.has_value()) {
     validateFrictionCompensationParams(*friction);
@@ -134,32 +157,62 @@ void bind_motion_torque(py::module &m) {
           m, "CartesianImpedanceBase");
   m.attr("ImpedanceMotion") = cartesian_impedance_base;
 
+  py::class_<PostureTask>(m, "PostureTask")
+      .def(
+          py::init<>([](const std::array<double, 7> &target,
+                        double stiffness,
+                        std::optional<double>
+                            damping,
+                        double max_torque) {
+            validateNonNegativeFinite(stiffness, "stiffness");
+            if (damping.has_value()) validateNonNegativeFinite(damping.value(), "damping");
+            validateNonNegativeFinite(max_torque, "max_torque");
+            return PostureTask{Eigen::Map<const Vector7d>(target.data()), stiffness, damping, max_torque};
+          }),
+          "target"_a,
+          "stiffness"_a,
+          "damping"_a = std::nullopt,
+          "max_torque"_a = 0.0)
+      .def_readwrite("target", &PostureTask::target)
+      .def_readwrite("stiffness", &PostureTask::stiffness)
+      .def_readwrite("damping", &PostureTask::damping)
+      .def_readwrite("max_torque", &PostureTask::max_torque);
+
+  py::class_<ManipulabilityTask>(m, "ManipulabilityTask")
+      .def(
+          py::init<>([](double gain, double damping, double max_torque) {
+            validateFinite(gain, "gain");
+            validateNonNegativeFinite(damping, "damping");
+            validateNonNegativeFinite(max_torque, "max_torque");
+            return ManipulabilityTask{gain, damping, max_torque};
+          }),
+          "gain"_a,
+          "damping"_a = 0.0,
+          "max_torque"_a = 0.0)
+      .def_readwrite("gain", &ManipulabilityTask::gain)
+      .def_readwrite("damping", &ManipulabilityTask::damping)
+      .def_readwrite("max_torque", &ManipulabilityTask::max_torque);
+
   py::class_<CartesianImpedanceGains>(m, "CartesianImpedanceGains")
       .def(
-          py::init<>([](double translational_stiffness, double rotational_stiffness, double nullspace_stiffness) {
-            return CartesianImpedanceGains{translational_stiffness, rotational_stiffness, nullspace_stiffness};
+          py::init<>([](double translational_stiffness, double rotational_stiffness) {
+            return CartesianImpedanceGains{translational_stiffness, rotational_stiffness};
           }),
           "translational_stiffness"_a = 2000.0,
-          "rotational_stiffness"_a = 200.0,
-          "nullspace_stiffness"_a = 0.0)
+          "rotational_stiffness"_a = 200.0)
       .def_readwrite("translational_stiffness", &CartesianImpedanceGains::translational_stiffness)
-      .def_readwrite("rotational_stiffness", &CartesianImpedanceGains::rotational_stiffness)
-      .def_readwrite("nullspace_stiffness", &CartesianImpedanceGains::nullspace_stiffness);
+      .def_readwrite("rotational_stiffness", &CartesianImpedanceGains::rotational_stiffness);
 
   py::class_<CartesianImpedanceGainsHandle, std::shared_ptr<CartesianImpedanceGainsHandle>>(
       m, "CartesianImpedanceGainsHandle")
       .def(py::init<>())
       .def(
           "set",
-          [](CartesianImpedanceGainsHandle &handle,
-             double translational_stiffness,
-             double rotational_stiffness,
-             double nullspace_stiffness) {
-            handle.set(CartesianImpedanceGains{translational_stiffness, rotational_stiffness, nullspace_stiffness});
+          [](CartesianImpedanceGainsHandle &handle, double translational_stiffness, double rotational_stiffness) {
+            handle.set(CartesianImpedanceGains{translational_stiffness, rotational_stiffness});
           },
           "translational_stiffness"_a,
-          "rotational_stiffness"_a,
-          "nullspace_stiffness"_a = 0.0)
+          "rotational_stiffness"_a)
       .def("clear", &CartesianImpedanceGainsHandle::clear)
       .def("get", &CartesianImpedanceGainsHandle::get)
       .def_property_readonly("has_gains", &CartesianImpedanceGainsHandle::hasGains);
@@ -288,8 +341,7 @@ If target_acceleration is provided, it is interpreted as the desired end-effecto
       .def_readwrite("translational_error_clip", &CartesianImpedanceBase::Params::translational_error_clip)
       .def_readwrite("rotational_error_clip", &CartesianImpedanceBase::Params::rotational_error_clip)
       .def_readwrite("force_constraints", &CartesianImpedanceBase::Params::force_constraints)
-      .def_readwrite("nullspace_target", &CartesianImpedanceBase::Params::nullspace_target)
-      .def_readwrite("nullspace_stiffness", &CartesianImpedanceBase::Params::nullspace_stiffness)
+      .def_readwrite("nullspace_tasks", &CartesianImpedanceBase::Params::nullspace_tasks)
       .def_readwrite("safety", &CartesianImpedanceBase::Params::safety)
       .def_readwrite("friction", &CartesianImpedanceBase::Params::friction);
 
@@ -466,9 +518,6 @@ interpolates toward them with the given time constant, allowing smooth runtime s
                         double rotational_stiffness,
                         std::optional<std::array<std::optional<double>, 6>>
                             force_constraints,
-                        std::optional<Vector7d>
-                            nullspace_target,
-                        double nullspace_stiffness,
                         double max_delta_tau,
                         std::optional<Vector7d>
                             lower_joint_limits,
@@ -481,14 +530,13 @@ interpolates toward them with the given time constant, allowing smooth runtime s
                         const Eigen::Vector3d &translational_error_clip,
                         const Eigen::Vector3d &rotational_error_clip,
                         double exponential_decay,
+                        const py::object &nullspace_tasks,
                         std::optional<FrictionCompensationParams>
                             friction) {
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
                 force_constraints,
-                nullspace_target,
-                nullspace_stiffness,
                 max_delta_tau,
                 lower_joint_limits,
                 upper_joint_limits,
@@ -498,6 +546,7 @@ interpolates toward them with the given time constant, allowing smooth runtime s
                 joint_limit_max_torque,
                 translational_error_clip,
                 rotational_error_clip,
+                toNullspaceTasks(nullspace_tasks),
                 friction);
             auto params = ExponentialImpedanceMotion::Params{};
             static_cast<CartesianImpedanceBase::Params &>(params) = base_params;
@@ -507,16 +556,12 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           }),
           R"doc(Construct an exponential Cartesian impedance motion toward a fixed target pose.
 
-Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.
-
-The optional nullspace_target and nullspace_stiffness parameters add a secondary joint-posture objective that is projected into the Jacobian nullspace, so it biases the redundant arm posture without changing the Cartesian task to first order.)doc",
+Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.)doc",
           "target"_a,
           py::arg_v("target_type", ReferenceType::kAbsolute, "_franky.ReferenceType.Absolute"),
           "translational_stiffness"_a = 2000,
           "rotational_stiffness"_a = 200,
           "force_constraints"_a = std::nullopt,
-          "nullspace_target"_a = std::nullopt,
-          "nullspace_stiffness"_a = 0.0,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
           "upper_joint_limits"_a = std::nullopt,
@@ -527,6 +572,7 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
           "translational_error_clip"_a = Eigen::Vector3d::Constant(0.10),
           "rotational_error_clip"_a = Eigen::Vector3d::Constant(0.25),
           "exponential_decay"_a = 0.005,
+          "nullspace_tasks"_a = py::list(),
           "friction"_a = std::nullopt)
       .def_property_readonly("target", &ExponentialImpedanceMotion::target)
       .def_property_readonly("params", [](const ExponentialImpedanceMotion &m) { return m.params(); });
@@ -541,9 +587,6 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
                         double rotational_stiffness,
                         std::optional<std::array<std::optional<double>, 6>>
                             force_constraints,
-                        std::optional<Vector7d>
-                            nullspace_target,
-                        double nullspace_stiffness,
                         double max_delta_tau,
                         std::optional<Vector7d>
                             lower_joint_limits,
@@ -557,14 +600,13 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
                         const Eigen::Vector3d &rotational_error_clip,
                         bool return_when_finished,
                         double finish_wait_factor,
+                        const py::object &nullspace_tasks,
                         std::optional<FrictionCompensationParams>
                             friction) {
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
                 force_constraints,
-                nullspace_target,
-                nullspace_stiffness,
                 max_delta_tau,
                 lower_joint_limits,
                 upper_joint_limits,
@@ -574,6 +616,7 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
                 joint_limit_max_torque,
                 translational_error_clip,
                 rotational_error_clip,
+                toNullspaceTasks(nullspace_tasks),
                 friction);
             auto params = CartesianImpedanceMotion::Params{};
             static_cast<CartesianImpedanceBase::Params &>(params) = base_params;
@@ -584,17 +627,13 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
           }),
           R"doc(Construct a Cartesian impedance motion that interpolates to a fixed target pose over the given duration.
 
-Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.
-
-The optional nullspace_target and nullspace_stiffness parameters add a secondary joint-posture objective that is projected into the Jacobian nullspace, so it biases the redundant arm posture without changing the Cartesian task to first order.)doc",
+Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.)doc",
           "target"_a,
           "duration"_a,
           py::arg_v("target_type", ReferenceType::kAbsolute, "_franky.ReferenceType.Absolute"),
           "translational_stiffness"_a = 2000,
           "rotational_stiffness"_a = 200,
           "force_constraints"_a = std::nullopt,
-          "nullspace_target"_a = std::nullopt,
-          "nullspace_stiffness"_a = 0.0,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
           "upper_joint_limits"_a = std::nullopt,
@@ -606,6 +645,7 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
           "rotational_error_clip"_a = Eigen::Vector3d::Constant(0.25),
           "return_when_finished"_a = true,
           "finish_wait_factor"_a = 1.2,
+          "nullspace_tasks"_a = py::list(),
           "friction"_a = std::nullopt)
       .def_property_readonly("target", &CartesianImpedanceMotion::target)
       .def_property_readonly("duration", &CartesianImpedanceMotion::duration)
@@ -621,9 +661,6 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
                         double rotational_stiffness,
                         std::optional<std::array<std::optional<double>, 6>>
                             force_constraints,
-                        std::optional<Vector7d>
-                            nullspace_target,
-                        double nullspace_stiffness,
                         double max_delta_tau,
                         std::optional<Vector7d>
                             lower_joint_limits,
@@ -638,14 +675,13 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
                         std::shared_ptr<CartesianImpedanceGainsHandle>
                             gains_handle,
                         double gains_time_constant,
+                        const py::object &nullspace_tasks,
                         std::optional<FrictionCompensationParams>
                             friction) {
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
                 force_constraints,
-                nullspace_target,
-                nullspace_stiffness,
                 max_delta_tau,
                 lower_joint_limits,
                 upper_joint_limits,
@@ -655,6 +691,7 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
                 joint_limit_max_torque,
                 translational_error_clip,
                 rotational_error_clip,
+                toNullspaceTasks(nullspace_tasks),
                 friction);
             if (gains_handle) {
               return std::make_shared<CartesianImpedanceTrackingMotion>(
@@ -666,7 +703,6 @@ The optional nullspace_target and nullspace_stiffness parameters add a secondary
 
 Each published Cartesian reference may optionally include a desired end-effector twist in the base frame.
 Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.
-The optional nullspace_target and nullspace_stiffness parameters add a secondary joint-posture objective that is projected into the Jacobian nullspace, so it biases the redundant arm posture without changing the Cartesian task to first order.
 
 If gains_handle is provided, the controller reads target gains from it each cycle and exponentially
 interpolates toward them with the given time constant, allowing smooth runtime stiffness changes.)doc",
@@ -674,8 +710,6 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           "translational_stiffness"_a = 2000,
           "rotational_stiffness"_a = 200,
           "force_constraints"_a = std::nullopt,
-          "nullspace_target"_a = std::nullopt,
-          "nullspace_stiffness"_a = 0.0,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
           "upper_joint_limits"_a = std::nullopt,
@@ -687,6 +721,7 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           "rotational_error_clip"_a = Eigen::Vector3d::Constant(0.25),
           "gains_handle"_a = nullptr,
           "gains_time_constant"_a = 0.1,
+          "nullspace_tasks"_a = py::list(),
           "friction"_a = std::nullopt)
       .def_property_readonly("params", [](const CartesianImpedanceTrackingMotion &m) { return m.params(); });
 }

@@ -724,6 +724,7 @@ motion = CartesianImpedanceMotion(
 from franky import (
     Affine,
     CartesianImpedanceTracker,
+    PostureTask,
     Twist,
 )
 
@@ -731,8 +732,9 @@ with CartesianImpedanceTracker(
     robot,
     translational_stiffness=1200.0,
     rotational_stiffness=80.0,
-    nullspace_target=[0.0, -0.6, 0.0, -2.2, 0.0, 1.7, 0.7],
-    nullspace_stiffness=10.0,
+    nullspace_tasks=[
+        PostureTask([0.0, -0.6, 0.0, -2.2, 0.0, 1.7, 0.7], stiffness=10.0),
+    ],
     max_delta_tau=0.5,
     period=0.01,
 ) as tracker:
@@ -755,11 +757,11 @@ time-based target generation.
 Cartesian damping is chosen internally as critically damped with respect to
 the requested stiffness.
 
-Cartesian impedance motions also support an optional secondary posture
-objective through `nullspace_target` and `nullspace_stiffness`. When enabled,
-the controller adds a joint-space posture term projected into the Jacobian
-nullspace, so it biases the redundant arm posture without changing the
-Cartesian task to first order.
+Cartesian impedance motions also support optional secondary objectives through
+`nullspace_tasks`. `PostureTask` adds a joint-space posture objective, and
+`ManipulabilityTask` adds a manipulability-gradient objective. Nullspace task
+torques are summed and projected into the Jacobian nullspace, so they bias the
+redundant arm posture without changing the Cartesian task to first order.
 
 `CartesianImpedanceTracker` also accepts `translational_error_clip` and
 `rotational_error_clip` (each a 3-vector in m and rad respectively) to hard-clip

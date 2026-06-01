@@ -65,8 +65,7 @@ class CartesianImpedanceTracker:
         rotational_stiffness: float = 200.0,
         translational_error_clip: Optional[np.ndarray] = None,
         rotational_error_clip: Optional[np.ndarray] = None,
-        nullspace_target: Optional[np.ndarray] = None,
-        nullspace_stiffness: float = 0.0,
+        nullspace_tasks=None,
         friction: Optional[FrictionCompensationParams] = None,
         max_delta_tau: float = 1.0,
         lower_joint_limits: Optional[np.ndarray] = None,
@@ -91,17 +90,14 @@ class CartesianImpedanceTracker:
         self._reference_handle.set(initial_pose)
 
         # Seed gains handle so the RT loop has a target from the start.
-        self._gains_handle.set(
-            translational_stiffness, rotational_stiffness, nullspace_stiffness
-        )
+        self._gains_handle.set(translational_stiffness, rotational_stiffness)
 
         kwargs = {
             "translational_stiffness": translational_stiffness,
             "rotational_stiffness": rotational_stiffness,
             "translational_error_clip": translational_error_clip,
             "rotational_error_clip": rotational_error_clip,
-            "nullspace_target": nullspace_target,
-            "nullspace_stiffness": nullspace_stiffness,
+            "nullspace_tasks": nullspace_tasks,
             "friction": friction,
             "max_delta_tau": max_delta_tau,
             "lower_joint_limits": lower_joint_limits,
@@ -166,7 +162,6 @@ class CartesianImpedanceTracker:
         *,
         translational_stiffness: Optional[float] = None,
         rotational_stiffness: Optional[float] = None,
-        nullspace_stiffness: Optional[float] = None,
     ) -> None:
         """Update impedance gains. Smoothed in the RT loop via exponential interpolation.
 
@@ -183,12 +178,7 @@ class CartesianImpedanceTracker:
             if rotational_stiffness is not None
             else (current.rotational_stiffness if current else 200.0)
         )
-        ns = (
-            nullspace_stiffness
-            if nullspace_stiffness is not None
-            else (current.nullspace_stiffness if current else 0.0)
-        )
-        self._gains_handle.set(ts, rs, ns)
+        self._gains_handle.set(ts, rs)
 
     # --- state ---
 
