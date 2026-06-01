@@ -30,6 +30,9 @@ struct JointReference {
  * This handle is intended to be written from a user thread while a single
  * JointImpedanceTrackingMotion is running. The motion reads the latest valid
  * reference each control cycle without needing to replace the motion object.
+ *
+ * Thread safety: at most one thread may call set() or clear() at a time.
+ * Concurrent reads from the RT callback via get() and hasReference() are safe.
  */
 class JointReferenceHandle {
  public:

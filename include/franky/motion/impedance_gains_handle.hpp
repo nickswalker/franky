@@ -31,6 +31,9 @@ struct CartesianImpedanceGains {
  * Same lock-free pattern as CartesianReferenceHandle. The RT loop reads the
  * target gains each cycle and exponentially interpolates toward them, so
  * stiffness changes are smooth rather than instantaneous.
+ *
+ * Thread safety: at most one thread may call set() or clear() at a time.
+ * Concurrent reads from the RT callback via get() and hasGains() are safe.
  */
 class CartesianImpedanceGainsHandle {
  public:
@@ -59,6 +62,9 @@ struct JointImpedanceGains {
 
 /**
  * @brief Double-buffered handle for updating joint impedance gains online.
+ *
+ * Thread safety: at most one thread may call set() or clear() at a time.
+ * Concurrent reads from the RT callback via get() and hasGains() are safe.
  */
 class JointImpedanceGainsHandle {
  public:
