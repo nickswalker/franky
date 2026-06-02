@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <optional>
 
 #include "franky/types.hpp"
 
@@ -18,10 +19,15 @@ inline Vector7d defaultJointImpedanceDamping() {
 
 /**
  * @brief Target gains for a Cartesian impedance controller.
+ *
+ * Damping defaults to nullopt, which means the controller uses critical damping
+ * (2*sqrt(stiffness)) for that axis. Set explicitly to override.
  */
 struct CartesianImpedanceGains {
   double translational_stiffness{2000.0};
   double rotational_stiffness{200.0};
+  std::optional<double> translational_damping{std::nullopt};
+  std::optional<double> rotational_damping{std::nullopt};
 };
 
 /**

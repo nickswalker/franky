@@ -195,24 +195,44 @@ void bind_motion_torque(py::module &m) {
 
   py::class_<CartesianImpedanceGains>(m, "CartesianImpedanceGains")
       .def(
-          py::init<>([](double translational_stiffness, double rotational_stiffness) {
-            return CartesianImpedanceGains{translational_stiffness, rotational_stiffness};
+          py::init<>([](double translational_stiffness,
+                        double rotational_stiffness,
+                        std::optional<double>
+                            translational_damping,
+                        std::optional<double>
+                            rotational_damping) {
+            return CartesianImpedanceGains{
+                translational_stiffness, rotational_stiffness, translational_damping, rotational_damping};
           }),
           "translational_stiffness"_a = 2000.0,
-          "rotational_stiffness"_a = 200.0)
+          "rotational_stiffness"_a = 200.0,
+          "translational_damping"_a = std::nullopt,
+          "rotational_damping"_a = std::nullopt)
       .def_readwrite("translational_stiffness", &CartesianImpedanceGains::translational_stiffness)
-      .def_readwrite("rotational_stiffness", &CartesianImpedanceGains::rotational_stiffness);
+      .def_readwrite("rotational_stiffness", &CartesianImpedanceGains::rotational_stiffness)
+      .def_readwrite("translational_damping", &CartesianImpedanceGains::translational_damping)
+      .def_readwrite("rotational_damping", &CartesianImpedanceGains::rotational_damping);
 
   py::class_<CartesianImpedanceGainsHandle, std::shared_ptr<CartesianImpedanceGainsHandle>>(
       m, "CartesianImpedanceGainsHandle")
       .def(py::init<>())
       .def(
           "set",
-          [](CartesianImpedanceGainsHandle &handle, double translational_stiffness, double rotational_stiffness) {
-            handle.set(CartesianImpedanceGains{translational_stiffness, rotational_stiffness});
+          [](CartesianImpedanceGainsHandle &handle,
+             double translational_stiffness,
+             double rotational_stiffness,
+             std::optional<double>
+                 translational_damping,
+             std::optional<double>
+                 rotational_damping) {
+            handle.set(
+                CartesianImpedanceGains{
+                    translational_stiffness, rotational_stiffness, translational_damping, rotational_damping});
           },
           "translational_stiffness"_a,
-          "rotational_stiffness"_a)
+          "rotational_stiffness"_a,
+          "translational_damping"_a = std::nullopt,
+          "rotational_damping"_a = std::nullopt)
       .def("clear", &CartesianImpedanceGainsHandle::clear)
       .def("get", &CartesianImpedanceGainsHandle::get)
       .def_property_readonly("has_gains", &CartesianImpedanceGainsHandle::hasGains);
@@ -338,6 +358,8 @@ If target_acceleration is provided, it is interpreted as the desired end-effecto
       .def(py::init<>())
       .def_readwrite("translational_stiffness", &CartesianImpedanceBase::Params::translational_stiffness)
       .def_readwrite("rotational_stiffness", &CartesianImpedanceBase::Params::rotational_stiffness)
+      .def_readwrite("translational_damping", &CartesianImpedanceBase::Params::translational_damping)
+      .def_readwrite("rotational_damping", &CartesianImpedanceBase::Params::rotational_damping)
       .def_readwrite("translational_error_clip", &CartesianImpedanceBase::Params::translational_error_clip)
       .def_readwrite("rotational_error_clip", &CartesianImpedanceBase::Params::rotational_error_clip)
       .def_readwrite("force_constraints", &CartesianImpedanceBase::Params::force_constraints)

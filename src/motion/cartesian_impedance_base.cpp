@@ -130,6 +130,8 @@ CartesianImpedanceBase::CartesianImpedanceBase(
       gains_time_constant_(gains_time_constant),
       current_translational_stiffness_(params.translational_stiffness),
       current_rotational_stiffness_(params.rotational_stiffness),
+      current_translational_damping_(params.translational_damping),
+      current_rotational_damping_(params.rotational_damping),
       Motion<franka::Torques>() {
   rebuildStiffnessDamping();
 }
@@ -139,8 +141,10 @@ void CartesianImpedanceBase::rebuildStiffnessDamping() {
   stiffness.topLeftCorner(3, 3) << current_translational_stiffness_ * Eigen::MatrixXd::Identity(3, 3);
   stiffness.bottomRightCorner(3, 3) << current_rotational_stiffness_ * Eigen::MatrixXd::Identity(3, 3);
   damping.setZero();
-  const double translational_damping = 2.0 * std::sqrt(current_translational_stiffness_);
-  const double rotational_damping = 2.0 * std::sqrt(current_rotational_stiffness_);
+  const double translational_damping =
+      current_translational_damping_.value_or(2.0 * std::sqrt(current_translational_stiffness_));
+  const double rotational_damping =
+      current_rotational_damping_.value_or(2.0 * std::sqrt(current_rotational_stiffness_));
   damping.topLeftCorner(3, 3) << translational_damping * Eigen::MatrixXd::Identity(3, 3);
   damping.bottomRightCorner(3, 3) << rotational_damping * Eigen::MatrixXd::Identity(3, 3);
 }
@@ -166,6 +170,18 @@ franka::Torques CartesianImpedanceBase::nextCommandImpl(
     current_translational_stiffness_ +=
         alpha * (target_gains.translational_stiffness - current_translational_stiffness_);
     current_rotational_stiffness_ += alpha * (target_gains.rotational_stiffness - current_rotational_stiffness_);
+    if (target_gains.translational_damping.has_value()) {
+      const double cur = current_translational_damping_.value_or(2.0 * std::sqrt(current_translational_stiffness_));
+      current_translational_damping_ = cur + alpha * (*target_gains.translational_damping - cur);
+    } else {
+      current_translational_damping_ = std::nullopt;
+    }
+    if (target_gains.rotational_damping.has_value()) {
+      const double cur = current_rotational_damping_.value_or(2.0 * std::sqrt(current_rotational_stiffness_));
+      current_rotational_damping_ = cur + alpha * (*target_gains.rotational_damping - cur);
+    } else {
+      current_rotational_damping_ = std::nullopt;
+    }
     rebuildStiffnessDamping();
   }
 
