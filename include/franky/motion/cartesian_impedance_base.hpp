@@ -106,11 +106,21 @@ class CartesianImpedanceBase : public Motion<franka::Torques> {
    * @brief Parameters for the impedance motion.
    */
   struct Params {
-    /** The translational stiffness in [10, 3000] N/m. */
+    /** The translational stiffness in N/m. */
     double translational_stiffness{2000};
 
-    /** The rotational stiffness in [1, 300] Nm/rad. */
+    /** The rotational stiffness in Nm/rad. */
     double rotational_stiffness{200};
+
+    /**
+     * Translational damping [N·s/m]. nullopt → critical damping (2*sqrt(stiffness)).
+     */
+    std::optional<double> translational_damping{std::nullopt};
+
+    /**
+     * Rotational damping [N·m·s/rad]. nullopt → critical damping (2*sqrt(stiffness)).
+     */
+    std::optional<double> rotational_damping{std::nullopt};
 
     /**
      * Maximum absolute Cartesian position error [m] used by the task-space controller.
@@ -192,6 +202,8 @@ class CartesianImpedanceBase : public Motion<franka::Torques> {
   double gains_time_constant_;
   double current_translational_stiffness_;
   double current_rotational_stiffness_;
+  std::optional<double> current_translational_damping_;
+  std::optional<double> current_rotational_damping_;
 
   Eigen::Matrix<double, 6, 6> stiffness, damping;
   Affine intermediate_target_;
