@@ -122,6 +122,7 @@ JointImpedanceParams makeJointImpedanceParams(
 
 CartesianImpedanceBase::Params makeCartesianImpedanceParams(
     double translational_stiffness, double rotational_stiffness,
+    std::optional<double> translational_damping, std::optional<double> rotational_damping,
     const std::optional<std::array<std::optional<double>, 6>> &force_constraints, double max_delta_tau,
     const std::optional<Vector7d> &lower_joint_limits, const std::optional<Vector7d> &upper_joint_limits,
     double joint_limit_activation_distance, double joint_limit_stiffness, double joint_limit_damping,
@@ -131,6 +132,8 @@ CartesianImpedanceBase::Params makeCartesianImpedanceParams(
   auto params = CartesianImpedanceBase::Params{};
   params.translational_stiffness = translational_stiffness;
   params.rotational_stiffness = rotational_stiffness;
+  params.translational_damping = translational_damping;
+  params.rotational_damping = rotational_damping;
   params.translational_error_clip = translational_error_clip;
   params.rotational_error_clip = rotational_error_clip;
   params.safety.max_delta_tau = max_delta_tau;
@@ -539,6 +542,10 @@ interpolates toward them with the given time constant, allowing smooth runtime s
                         ReferenceType target_type,
                         double translational_stiffness,
                         double rotational_stiffness,
+                        std::optional<double>
+                            translational_damping,
+                        std::optional<double>
+                            rotational_damping,
                         std::optional<std::array<std::optional<double>, 6>>
                             force_constraints,
                         double max_delta_tau,
@@ -559,6 +566,8 @@ interpolates toward them with the given time constant, allowing smooth runtime s
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
+                translational_damping,
+                rotational_damping,
                 force_constraints,
                 max_delta_tau,
                 lower_joint_limits,
@@ -579,11 +588,13 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           }),
           R"doc(Construct an exponential Cartesian impedance motion toward a fixed target pose.
 
-Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.)doc",
+Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly to override.)doc",
           "target"_a,
           py::arg_v("target_type", ReferenceType::kAbsolute, "_franky.ReferenceType.Absolute"),
           "translational_stiffness"_a = 2000,
           "rotational_stiffness"_a = 200,
+          "translational_damping"_a = std::nullopt,
+          "rotational_damping"_a = std::nullopt,
           "force_constraints"_a = std::nullopt,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
@@ -608,6 +619,10 @@ Cartesian damping is chosen internally as critically damped with respect to the 
                         ReferenceType target_type,
                         double translational_stiffness,
                         double rotational_stiffness,
+                        std::optional<double>
+                            translational_damping,
+                        std::optional<double>
+                            rotational_damping,
                         std::optional<std::array<std::optional<double>, 6>>
                             force_constraints,
                         double max_delta_tau,
@@ -629,6 +644,8 @@ Cartesian damping is chosen internally as critically damped with respect to the 
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
+                translational_damping,
+                rotational_damping,
                 force_constraints,
                 max_delta_tau,
                 lower_joint_limits,
@@ -650,12 +667,14 @@ Cartesian damping is chosen internally as critically damped with respect to the 
           }),
           R"doc(Construct a Cartesian impedance motion that interpolates to a fixed target pose over the given duration.
 
-Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.)doc",
+Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly to override.)doc",
           "target"_a,
           "duration"_a,
           py::arg_v("target_type", ReferenceType::kAbsolute, "_franky.ReferenceType.Absolute"),
           "translational_stiffness"_a = 2000,
           "rotational_stiffness"_a = 200,
+          "translational_damping"_a = std::nullopt,
+          "rotational_damping"_a = std::nullopt,
           "force_constraints"_a = std::nullopt,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
@@ -682,6 +701,11 @@ Cartesian damping is chosen internally as critically damped with respect to the 
           py::init<>([](const std::shared_ptr<CartesianReferenceHandle> &reference_handle,
                         double translational_stiffness,
                         double rotational_stiffness,
+                        std::optional<double>
+                            translational_damping,
+                        std::optional<double>
+                            rotational_damping,
+                        CartesianImpedanceDynamicsMode dynamics_mode,
                         std::optional<std::array<std::optional<double>, 6>>
                             force_constraints,
                         double max_delta_tau,
@@ -704,6 +728,8 @@ Cartesian damping is chosen internally as critically damped with respect to the 
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
+                translational_damping,
+                rotational_damping,
                 force_constraints,
                 max_delta_tau,
                 lower_joint_limits,
@@ -732,6 +758,9 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           "reference_handle"_a,
           "translational_stiffness"_a = 2000,
           "rotational_stiffness"_a = 200,
+          "translational_damping"_a = std::nullopt,
+          "rotational_damping"_a = std::nullopt,
+          py::arg_v("dynamics_mode", CartesianImpedanceDynamicsMode::kWrench, "_franky.CartesianImpedanceDynamicsMode.Wrench"),
           "force_constraints"_a = std::nullopt,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
