@@ -121,8 +121,8 @@ JointImpedanceParams makeJointImpedanceParams(
 }
 
 CartesianImpedanceBase::Params makeCartesianImpedanceParams(
-    double translational_stiffness, double rotational_stiffness,
-    std::optional<double> translational_damping, std::optional<double> rotational_damping,
+    double translational_stiffness, double rotational_stiffness, std::optional<double> translational_damping,
+    std::optional<double> rotational_damping,
     const std::optional<std::array<std::optional<double>, 6>> &force_constraints, double max_delta_tau,
     const std::optional<Vector7d> &lower_joint_limits, const std::optional<Vector7d> &upper_joint_limits,
     double joint_limit_activation_distance, double joint_limit_stiffness, double joint_limit_damping,
@@ -742,6 +742,7 @@ Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly t
                 rotational_error_clip,
                 toNullspaceTasks(nullspace_tasks),
                 friction);
+            base_params.dynamics_mode = dynamics_mode;
             if (gains_handle) {
               return std::make_shared<CartesianImpedanceTrackingMotion>(
                   reference_handle, base_params, gains_handle, gains_time_constant);
@@ -751,7 +752,7 @@ Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly t
           R"doc(Construct a dynamic Cartesian impedance tracking controller driven by a CartesianReferenceHandle.
 
 Each published Cartesian reference may optionally include a desired end-effector twist in the base frame.
-Cartesian damping is chosen internally as critically damped with respect to the requested stiffness.
+Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly to override.
 
 If gains_handle is provided, the controller reads target gains from it each cycle and exponentially
 interpolates toward them with the given time constant, allowing smooth runtime stiffness changes.)doc",
@@ -760,7 +761,10 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           "rotational_stiffness"_a = 200,
           "translational_damping"_a = std::nullopt,
           "rotational_damping"_a = std::nullopt,
-          py::arg_v("dynamics_mode", CartesianImpedanceDynamicsMode::kWrench, "_franky.CartesianImpedanceDynamicsMode.Wrench"),
+          py::arg_v(
+              "dynamics_mode",
+              CartesianImpedanceDynamicsMode::kWrench,
+              "_franky.CartesianImpedanceDynamicsMode.Wrench"),
           "force_constraints"_a = std::nullopt,
           "max_delta_tau"_a = 1.0,
           "lower_joint_limits"_a = std::nullopt,
