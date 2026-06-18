@@ -4,6 +4,7 @@
 #include <Eigen/Geometry>
 #include <Eigen/SVD>
 #include <array>
+#include <atomic>
 #include <map>
 #include <memory>
 #include <optional>
@@ -94,6 +95,48 @@ struct ManipulabilityTask {
 using NullspaceTask = std::variant<PostureTask, ManipulabilityTask>;
 
 /**
+ * @brief Runtime-adjustable gains for a nullspace task.
+ *
+ * The controller consumes the posture_* fields for PostureTask entries and the
+ * manipulability_* fields for ManipulabilityTask entries. Keeping both sets in
+ * one plain type avoids a second variant hierarchy in the realtime gains buffer.
+ */
+struct NullspaceGains {
+  double posture_stiffness{0.0};
+  std::optional<double> posture_damping{std::nullopt};
+  double posture_max_torque{0.0};
+
+  double manipulability_gain{0.0};
+  double manipulability_damping{0.0};
+  double manipulability_max_torque{0.0};
+};
+
+/**
+ * @brief Double-buffered handle for updating nullspace task gains online.
+ *
+ * Constructed from a task vector to seed the initial gains. set() writes to
+ * the inactive buffer and flips the active index; each controller consumes only
+ * the named sections corresponding to its configured nullspace tasks.
+ *
+ * Thread safety: at most one thread may call set() or clear() at a time.
+ * Concurrent reads from the RT callback via activeGains() and hasGains() are safe.
+ */
+class NullspaceGainsHandle {
+ public:
+  explicit NullspaceGainsHandle(const std::vector<NullspaceTask> &tasks);
+
+  void set(const NullspaceGains &gains);
+  void clear();
+  [[nodiscard]] bool hasGains() const;
+  [[nodiscard]] const NullspaceGains &activeGains() const;
+
+ private:
+  std::array<NullspaceGains, 2> buffers_{};
+  std::atomic<uint8_t> active_index_{0};
+  std::atomic<bool> valid_{false};
+};
+
+/**
  * @brief Base class for client-side cartesian impedance motions.
  *
  * This motion is implements a cartesian impedance controller on the client
@@ -158,17 +201,26 @@ class CartesianImpedanceBase : public Motion<franka::Torques> {
   };
 
   /**
+   * @brief Runtime update handles for long-lived Cartesian impedance motions.
+   */
+  struct RuntimeOptions {
+    /** Optional handle for runtime Cartesian gain updates. */
+    std::shared_ptr<CartesianImpedanceGainsHandle> gains_handle{};
+
+    /** Optional handle for runtime nullspace task gain updates. */
+    std::shared_ptr<NullspaceGainsHandle> nullspace_gains_handle{};
+
+    /** Smoothing time constant for runtime gain transitions [s]. */
+    double gains_time_constant{0.1};
+  };
+
+  /**
    * @param target The target pose.
    * @param params Parameters for the motion.
-   * @param gains_handle Optional handle for runtime gain updates. When null,
-   *        gains are static (set once from params). When present, gains are
-   *        read each cycle and exponentially interpolated toward the target.
-   * @param gains_time_constant Smoothing time constant for gain transitions [s].
-   *        Only used when gains_handle is provided. Default 0.1s.
+   * @param runtime Runtime update handles and smoothing configuration.
    */
-  explicit CartesianImpedanceBase(
-      Affine target, const Params &params, std::shared_ptr<CartesianImpedanceGainsHandle> gains_handle = nullptr,
-      double gains_time_constant = 0.1);
+  explicit CartesianImpedanceBase(Affine target, const Params &params);
+  CartesianImpedanceBase(Affine target, const Params &params, RuntimeOptions runtime);
 
   [[nodiscard]] inline Affine target() const { return absolute_target_; }
 
@@ -199,11 +251,13 @@ class CartesianImpedanceBase : public Motion<franka::Torques> {
   Params params_;
 
   std::shared_ptr<CartesianImpedanceGainsHandle> gains_handle_;
+  std::shared_ptr<NullspaceGainsHandle> nullspace_gains_handle_;
   double gains_time_constant_;
   double current_translational_stiffness_;
   double current_rotational_stiffness_;
   std::optional<double> current_translational_damping_;
   std::optional<double> current_rotational_damping_;
+  NullspaceGains current_nullspace_gains_;
 
   Eigen::Matrix<double, 6, 6> stiffness, damping;
   Affine intermediate_target_;
