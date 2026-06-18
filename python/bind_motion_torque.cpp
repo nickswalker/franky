@@ -196,6 +196,62 @@ void bind_motion_torque(py::module &m) {
       .def_readwrite("damping", &ManipulabilityTask::damping)
       .def_readwrite("max_torque", &ManipulabilityTask::max_torque);
 
+  py::class_<NullspaceGains>(m, "NullspaceGains")
+      .def(
+          py::init<>([](double posture_stiffness,
+                        std::optional<double>
+                            posture_damping,
+                        double posture_max_torque,
+                        double manipulability_gain,
+                        double manipulability_damping,
+                        double manipulability_max_torque) {
+            validateNonNegativeFinite(posture_stiffness, "posture_stiffness");
+            if (posture_damping.has_value()) validateNonNegativeFinite(posture_damping.value(), "posture_damping");
+            validateNonNegativeFinite(posture_max_torque, "posture_max_torque");
+            validateFinite(manipulability_gain, "manipulability_gain");
+            validateNonNegativeFinite(manipulability_damping, "manipulability_damping");
+            validateNonNegativeFinite(manipulability_max_torque, "manipulability_max_torque");
+            return NullspaceGains{
+                posture_stiffness,
+                posture_damping,
+                posture_max_torque,
+                manipulability_gain,
+                manipulability_damping,
+                manipulability_max_torque};
+          }),
+          "posture_stiffness"_a = 0.0,
+          "posture_damping"_a = std::nullopt,
+          "posture_max_torque"_a = 0.0,
+          "manipulability_gain"_a = 0.0,
+          "manipulability_damping"_a = 0.0,
+          "manipulability_max_torque"_a = 0.0)
+      .def_readwrite("posture_stiffness", &NullspaceGains::posture_stiffness)
+      .def_readwrite("posture_damping", &NullspaceGains::posture_damping)
+      .def_readwrite("posture_max_torque", &NullspaceGains::posture_max_torque)
+      .def_readwrite("manipulability_gain", &NullspaceGains::manipulability_gain)
+      .def_readwrite("manipulability_damping", &NullspaceGains::manipulability_damping)
+      .def_readwrite("manipulability_max_torque", &NullspaceGains::manipulability_max_torque);
+
+  py::class_<NullspaceGainsHandle, std::shared_ptr<NullspaceGainsHandle>>(m, "NullspaceGainsHandle")
+      .def(
+          py::init<>([](const py::object &nullspace_tasks) {
+            return std::make_shared<NullspaceGainsHandle>(toNullspaceTasks(nullspace_tasks));
+          }),
+          R"doc(Construct a NullspaceGainsHandle for the given task list.
+
+The task list seeds the initial gains. When attached to a motion, only fields corresponding
+to that motion's configured nullspace tasks are consumed.)doc",
+          "nullspace_tasks"_a)
+      .def(
+          "set",
+          [](NullspaceGainsHandle &handle, const NullspaceGains &gains) { handle.set(gains); },
+          R"doc(Update nullspace task gains for a running motion.
+
+Only the fields corresponding to configured nullspace task kinds are consumed by the controller.)doc",
+          "gains"_a)
+      .def("clear", &NullspaceGainsHandle::clear)
+      .def_property_readonly("has_gains", &NullspaceGainsHandle::hasGains);
+
   py::class_<CartesianImpedanceGains>(m, "CartesianImpedanceGains")
       .def(
           py::init<>([](double translational_stiffness,
@@ -724,7 +780,9 @@ Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly t
                         double gains_time_constant,
                         const py::object &nullspace_tasks,
                         std::optional<FrictionCompensationParams>
-                            friction) {
+                            friction,
+                        std::shared_ptr<NullspaceGainsHandle>
+                            nullspace_gains_handle) {
             auto base_params = makeCartesianImpedanceParams(
                 translational_stiffness,
                 rotational_stiffness,
@@ -743,9 +801,13 @@ Damping defaults to None (critical damping, 2*sqrt(stiffness)). Set explicitly t
                 toNullspaceTasks(nullspace_tasks),
                 friction);
             base_params.dynamics_mode = dynamics_mode;
-            if (gains_handle) {
+            if (gains_handle || nullspace_gains_handle) {
+              auto runtime = CartesianImpedanceBase::RuntimeOptions{};
+              runtime.gains_handle = std::move(gains_handle);
+              runtime.nullspace_gains_handle = std::move(nullspace_gains_handle);
+              runtime.gains_time_constant = gains_time_constant;
               return std::make_shared<CartesianImpedanceTrackingMotion>(
-                  reference_handle, base_params, gains_handle, gains_time_constant);
+                  reference_handle, base_params, std::move(runtime));
             }
             return std::make_shared<CartesianImpedanceTrackingMotion>(reference_handle, base_params);
           }),
@@ -778,6 +840,7 @@ interpolates toward them with the given time constant, allowing smooth runtime s
           "gains_handle"_a = nullptr,
           "gains_time_constant"_a = 0.1,
           "nullspace_tasks"_a = py::list(),
-          "friction"_a = std::nullopt)
+          "friction"_a = std::nullopt,
+          "nullspace_gains_handle"_a = nullptr)
       .def_property_readonly("params", [](const CartesianImpedanceTrackingMotion &m) { return m.params(); });
 }

@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <map>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 
@@ -15,6 +16,82 @@
 #include "franky/robot_pose.hpp"
 
 namespace franky {
+
+namespace {
+
+void rejectDuplicateRuntimeNullspaceTasks(const std::vector<NullspaceTask> &tasks) {
+  bool has_posture = false;
+  bool has_manipulability = false;
+  for (const auto &task : tasks) {
+    std::visit(
+        [&](const auto &t) {
+          using T = std::decay_t<decltype(t)>;
+          if constexpr (std::is_same_v<T, PostureTask>) {
+            if (has_posture) {
+              throw std::invalid_argument("Runtime nullspace gains support at most one PostureTask");
+            }
+            has_posture = true;
+          } else {
+            if (has_manipulability) {
+              throw std::invalid_argument("Runtime nullspace gains support at most one ManipulabilityTask");
+            }
+            has_manipulability = true;
+          }
+        },
+        task);
+  }
+}
+
+NullspaceGains nullspaceGainsFromTasks(const std::vector<NullspaceTask> &tasks) {
+  NullspaceGains gains{};
+  for (const auto &task : tasks) {
+    std::visit(
+        [&](const auto &t) {
+          using T = std::decay_t<decltype(t)>;
+          if constexpr (std::is_same_v<T, PostureTask>) {
+            gains.posture_stiffness = t.stiffness;
+            gains.posture_damping = t.damping;
+            gains.posture_max_torque = t.max_torque;
+          } else {
+            gains.manipulability_gain = t.gain;
+            gains.manipulability_damping = t.damping;
+            gains.manipulability_max_torque = t.max_torque;
+          }
+        },
+        task);
+  }
+  return gains;
+}
+
+double lerp(double current, double target, double alpha) { return current + alpha * (target - current); }
+
+std::optional<double> lerpOptionalDamping(
+    std::optional<double> current, std::optional<double> target, double default_current, double alpha) {
+  if (!target.has_value()) return std::nullopt;
+  return lerp(current.value_or(default_current), *target, alpha);
+}
+}  // namespace
+
+NullspaceGainsHandle::NullspaceGainsHandle(const std::vector<NullspaceTask> &tasks) : buffers_{} {
+  const auto initial_gains = nullspaceGainsFromTasks(tasks);
+  buffers_[0] = initial_gains;
+  buffers_[1] = initial_gains;
+}
+
+void NullspaceGainsHandle::set(const NullspaceGains &gains) {
+  const uint8_t next_index = 1 - active_index_.load(std::memory_order_relaxed);
+  buffers_[next_index] = gains;
+  active_index_.store(next_index, std::memory_order_release);
+  valid_.store(true, std::memory_order_release);
+}
+
+void NullspaceGainsHandle::clear() { valid_.store(false, std::memory_order_release); }
+
+bool NullspaceGainsHandle::hasGains() const { return valid_.load(std::memory_order_acquire); }
+
+const NullspaceGains &NullspaceGainsHandle::activeGains() const {
+  return buffers_[active_index_.load(std::memory_order_acquire)];
+}
 
 namespace {
 
@@ -106,6 +183,20 @@ Vector7d manipulabilityGradient(const Model &model, const RobotState &robot_stat
   return gradient;
 }
 
+PostureTask applyGains(PostureTask task, const NullspaceGains &g) {
+  task.stiffness = g.posture_stiffness;
+  task.damping = g.posture_damping;
+  task.max_torque = g.posture_max_torque;
+  return task;
+}
+
+ManipulabilityTask applyGains(ManipulabilityTask task, const NullspaceGains &g) {
+  task.gain = g.manipulability_gain;
+  task.damping = g.manipulability_damping;
+  task.max_torque = g.manipulability_max_torque;
+  return task;
+}
+
 Vector7d computeTaskTorque(const PostureTask &task, const RobotState &robot_state) {
   const double stiffness = task.stiffness;
   if (stiffness <= 0.0) return Vector7d::Zero();
@@ -119,20 +210,26 @@ Vector7d computeTaskTorque(
   Vector7d tau = task.gain * manipulabilityGradient(model, robot_state, jacobian) - task.damping * robot_state.dq;
   return clampTorque(tau, task.max_torque);
 }
+
 }  // namespace
 
+CartesianImpedanceBase::CartesianImpedanceBase(Affine target, const CartesianImpedanceBase::Params &params)
+    : CartesianImpedanceBase(std::move(target), params, RuntimeOptions{}) {}
+
 CartesianImpedanceBase::CartesianImpedanceBase(
-    Affine target, const CartesianImpedanceBase::Params &params,
-    std::shared_ptr<CartesianImpedanceGainsHandle> gains_handle, double gains_time_constant)
+    Affine target, const CartesianImpedanceBase::Params &params, CartesianImpedanceBase::RuntimeOptions runtime)
     : target_(std::move(target)),
       params_(params),
-      gains_handle_(std::move(gains_handle)),
-      gains_time_constant_(gains_time_constant),
+      gains_handle_(std::move(runtime.gains_handle)),
+      nullspace_gains_handle_(std::move(runtime.nullspace_gains_handle)),
+      gains_time_constant_(runtime.gains_time_constant),
       current_translational_stiffness_(params.translational_stiffness),
       current_rotational_stiffness_(params.rotational_stiffness),
       current_translational_damping_(params.translational_damping),
       current_rotational_damping_(params.rotational_damping),
       Motion<franka::Torques>() {
+  if (nullspace_gains_handle_) rejectDuplicateRuntimeNullspaceTasks(params_.nullspace_tasks);
+  current_nullspace_gains_ = nullspaceGainsFromTasks(params.nullspace_tasks);
   rebuildStiffnessDamping();
 }
 
@@ -162,27 +259,37 @@ franka::Torques CartesianImpedanceBase::nextCommandImpl(
   auto [reference, finish] = update(robot_state, time_step, rel_time, abs_time);
   intermediate_target_ = reference.target;
 
-  // If a gains handle is present, interpolate toward the target gains.
+  const double dt = time_step.toSec();
+  const double alpha = 1.0 - std::exp(-dt / gains_time_constant_);
+
   if (gains_handle_ && gains_handle_->hasGains()) {
     const auto target_gains = gains_handle_->get();
-    const double dt = time_step.toSec();
-    const double alpha = 1.0 - std::exp(-dt / gains_time_constant_);
-    current_translational_stiffness_ +=
-        alpha * (target_gains.translational_stiffness - current_translational_stiffness_);
-    current_rotational_stiffness_ += alpha * (target_gains.rotational_stiffness - current_rotational_stiffness_);
-    if (target_gains.translational_damping.has_value()) {
-      const double cur = current_translational_damping_.value_or(2.0 * std::sqrt(current_translational_stiffness_));
-      current_translational_damping_ = cur + alpha * (*target_gains.translational_damping - cur);
-    } else {
-      current_translational_damping_ = std::nullopt;
-    }
-    if (target_gains.rotational_damping.has_value()) {
-      const double cur = current_rotational_damping_.value_or(2.0 * std::sqrt(current_rotational_stiffness_));
-      current_rotational_damping_ = cur + alpha * (*target_gains.rotational_damping - cur);
-    } else {
-      current_rotational_damping_ = std::nullopt;
-    }
+    current_translational_stiffness_ =
+        lerp(current_translational_stiffness_, target_gains.translational_stiffness, alpha);
+    current_rotational_stiffness_ = lerp(current_rotational_stiffness_, target_gains.rotational_stiffness, alpha);
+    current_translational_damping_ = lerpOptionalDamping(
+        current_translational_damping_,
+        target_gains.translational_damping,
+        2.0 * std::sqrt(current_translational_stiffness_),
+        alpha);
+    current_rotational_damping_ = lerpOptionalDamping(
+        current_rotational_damping_,
+        target_gains.rotational_damping,
+        2.0 * std::sqrt(current_rotational_stiffness_),
+        alpha);
     rebuildStiffnessDamping();
+  }
+
+  if (nullspace_gains_handle_ && nullspace_gains_handle_->hasGains()) {
+    const auto &target = nullspace_gains_handle_->activeGains();
+    auto &cur = current_nullspace_gains_;
+    cur.posture_stiffness = lerp(cur.posture_stiffness, target.posture_stiffness, alpha);
+    cur.posture_max_torque = lerp(cur.posture_max_torque, target.posture_max_torque, alpha);
+    cur.posture_damping =
+        lerpOptionalDamping(cur.posture_damping, target.posture_damping, 2.0 * std::sqrt(cur.posture_stiffness), alpha);
+    cur.manipulability_gain = lerp(cur.manipulability_gain, target.manipulability_gain, alpha);
+    cur.manipulability_damping = lerp(cur.manipulability_damping, target.manipulability_damping, alpha);
+    cur.manipulability_max_torque = lerp(cur.manipulability_max_torque, target.manipulability_max_torque, alpha);
   }
 
   auto model = robot()->model();
@@ -252,10 +359,11 @@ franka::Torques CartesianImpedanceBase::nextCommandImpl(
       tau_nullspace_unprojected += std::visit(
           [&](const auto &concrete_task) -> Vector7d {
             using Task = std::decay_t<decltype(concrete_task)>;
+            const auto effective = applyGains(concrete_task, current_nullspace_gains_);
             if constexpr (std::is_same_v<Task, ManipulabilityTask>) {
-              return computeTaskTorque(concrete_task, *model, robot_state, jacobian);
+              return computeTaskTorque(effective, *model, robot_state, jacobian);
             } else {
-              return computeTaskTorque(concrete_task, robot_state);
+              return computeTaskTorque(effective, robot_state);
             }
           },
           task);

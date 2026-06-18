@@ -51,8 +51,7 @@ class CartesianImpedanceTrackingMotion : public CartesianImpedanceBase {
   explicit CartesianImpedanceTrackingMotion(std::shared_ptr<CartesianReferenceHandle> reference_handle);
   CartesianImpedanceTrackingMotion(std::shared_ptr<CartesianReferenceHandle> reference_handle, const Params &params);
   CartesianImpedanceTrackingMotion(
-      std::shared_ptr<CartesianReferenceHandle> reference_handle, const Params &params,
-      std::shared_ptr<CartesianImpedanceGainsHandle> gains_handle, double gains_time_constant = 0.1);
+      std::shared_ptr<CartesianReferenceHandle> reference_handle, const Params &params, RuntimeOptions runtime);
   explicit CartesianImpedanceTrackingMotion(ReferenceCallback reference_callback);
   CartesianImpedanceTrackingMotion(ReferenceCallback reference_callback, const Params &params);
 
