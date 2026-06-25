@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "franky/motion/cartesian_impedance_base.hpp"
+#include "franky/motion/impedance_gains_handle.hpp"
 
 namespace franky {
 
@@ -16,6 +17,9 @@ namespace franky {
  * CartesianImpedanceTrackingMotion is running. The motion reads the latest
  * valid reference each control cycle without needing to replace the motion
  * object.
+ *
+ * Thread safety: at most one thread may call set() or clear() at a time.
+ * Concurrent reads from the RT callback via get() and hasReference() are safe.
  */
 class CartesianReferenceHandle {
  public:
@@ -46,6 +50,9 @@ class CartesianImpedanceTrackingMotion : public CartesianImpedanceBase {
 
   explicit CartesianImpedanceTrackingMotion(std::shared_ptr<CartesianReferenceHandle> reference_handle);
   CartesianImpedanceTrackingMotion(std::shared_ptr<CartesianReferenceHandle> reference_handle, const Params &params);
+  CartesianImpedanceTrackingMotion(
+      std::shared_ptr<CartesianReferenceHandle> reference_handle, const Params &params,
+      std::shared_ptr<CartesianImpedanceGainsHandle> gains_handle, double gains_time_constant = 0.1);
   explicit CartesianImpedanceTrackingMotion(ReferenceCallback reference_callback);
   CartesianImpedanceTrackingMotion(ReferenceCallback reference_callback, const Params &params);
 

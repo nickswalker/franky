@@ -3,7 +3,9 @@
 #include <array>
 #include <atomic>
 #include <functional>
+#include <memory>
 
+#include "franky/motion/impedance_gains_handle.hpp"
 #include "franky/motion/joint_impedance_motion.hpp"
 
 namespace franky {
@@ -28,6 +30,9 @@ struct JointReference {
  * This handle is intended to be written from a user thread while a single
  * JointImpedanceTrackingMotion is running. The motion reads the latest valid
  * reference each control cycle without needing to replace the motion object.
+ *
+ * Thread safety: at most one thread may call set() or clear() at a time.
+ * Concurrent reads from the RT callback via get() and hasReference() are safe.
  */
 class JointReferenceHandle {
  public:
@@ -75,6 +80,9 @@ class JointImpedanceTrackingMotion : public JointImpedanceBase {
 
   explicit JointImpedanceTrackingMotion(std::shared_ptr<JointReferenceHandle> reference_handle);
   JointImpedanceTrackingMotion(std::shared_ptr<JointReferenceHandle> reference_handle, const Params &params);
+  JointImpedanceTrackingMotion(
+      std::shared_ptr<JointReferenceHandle> reference_handle, const Params &params,
+      std::shared_ptr<JointImpedanceGainsHandle> gains_handle, double gains_time_constant = 0.1);
   explicit JointImpedanceTrackingMotion(ReferenceCallback reference_callback);
   JointImpedanceTrackingMotion(ReferenceCallback reference_callback, const Params &params);
 
