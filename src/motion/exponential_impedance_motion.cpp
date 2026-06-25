@@ -16,6 +16,12 @@ ExponentialImpedanceMotion::ExponentialImpedanceMotion(
     const Affine &target, const ExponentialImpedanceMotion::Params &params)
     : CartesianImpedanceBase(target, params), params_(params) {}
 
+void ExponentialImpedanceMotion::initImpl(
+    const RobotState &robot_state, const std::optional<franka::Torques> &previous_command) {
+  CartesianImpedanceBase::initImpl(robot_state, previous_command);
+  if (params_.target_type == ReferenceType::kRelative) setAbsoluteTarget(robot_state.O_T_EE * target_spec());
+}
+
 std::tuple<CartesianReference, bool> ExponentialImpedanceMotion::update(
     const RobotState &robot_state, franka::Duration time_step, franka::Duration time, franka::Duration /*abs_time*/) {
   constexpr double kNominalDt = 1e-3;
