@@ -47,6 +47,15 @@ struct JointImpedanceParams : public TorqueSafetyParams {
   /** Joint damping gains in [Nms/rad]. */
   Vector7d damping{defaultJointImpedanceDamping()};
 
+  /**
+   * Maximum absolute joint position error [rad] used by the joint-space controller.
+   *
+   * The position error is clamped elementwise before the spring torque is computed.
+   * This bounds the commanded torque when the reference jumps or an obstacle prevents
+   * a joint from reaching its target
+   */
+  Vector7d error_clip{Vector7d::Constant(0.5)};
+
   /** Constant torque offset added to every command in [Nm]. */
   Vector7d constant_torque_offset{Vector7d::Zero()};
 

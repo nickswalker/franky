@@ -54,7 +54,8 @@ franka::Torques JointImpedanceBase::computeCommand(
   }
 
   Vector7d torque_feedforward = params_.constant_torque_offset + reference.tau_ff;
-  Vector7d tau_d = current_stiffness_.asDiagonal() * (reference.q - robot_state.q) +
+  const Vector7d q_error = (reference.q - robot_state.q).cwiseMax(-params_.error_clip).cwiseMin(params_.error_clip);
+  Vector7d tau_d = current_stiffness_.asDiagonal() * q_error +
                    current_damping_.asDiagonal() * (reference.dq - robot_state.dq) + torque_feedforward;
 
   if (params_.lower_joint_limits.has_value() && params_.upper_joint_limits.has_value()) {
