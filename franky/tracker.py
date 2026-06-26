@@ -7,6 +7,7 @@ import numpy as np
 
 from ._franky import (
     Affine,
+    CartesianImpedanceGains,
     CartesianImpedanceGainsHandle,
     CartesianImpedanceTrackingMotion,
     CartesianReferenceHandle,
@@ -61,12 +62,16 @@ class CartesianImpedanceTracker:
         self,
         robot,
         *,
-        translational_stiffness: float = 2000.0,
-        rotational_stiffness: float = 200.0,
+        stiffness: Optional[np.ndarray] = None,
+        damping: Optional[np.ndarray] = None,
+        translational_stiffness: Optional[float] = None,
+        rotational_stiffness: Optional[float] = None,
+        translational_damping: Optional[float] = None,
+        rotational_damping: Optional[float] = None,
         translational_error_clip: Optional[np.ndarray] = None,
         rotational_error_clip: Optional[np.ndarray] = None,
-        nullspace_target: Optional[np.ndarray] = None,
-        nullspace_stiffness: float = 0.0,
+        nullspace_tasks=None,
+        friction: Optional[FrictionCompensationParams] = None,
         max_delta_tau: float = 1.0,
         lower_joint_limits: Optional[np.ndarray] = None,
         upper_joint_limits: Optional[np.ndarray] = None,
@@ -89,18 +94,24 @@ class CartesianImpedanceTracker:
         initial_pose = self._robot.current_pose.end_effector_pose
         self._reference_handle.set(initial_pose)
 
-        # Seed gains handle so the RT loop has a target from the start.
-        self._gains_handle.set(
-            translational_stiffness, rotational_stiffness, nullspace_stiffness
+        # Seed initial target from current pose so the robot doesn't jump.
+        gains = CartesianImpedanceGains(
+            stiffness=stiffness,
+            damping=damping,
+            translational_stiffness=translational_stiffness,
+            rotational_stiffness=rotational_stiffness,
+            translational_damping=translational_damping,
+            rotational_damping=rotational_damping,
         )
+        self._gains_handle.set(gains)
 
         kwargs = {
-            "translational_stiffness": translational_stiffness,
-            "rotational_stiffness": rotational_stiffness,
+            "stiffness": gains.stiffness,
+            "damping": gains.damping,
             "translational_error_clip": translational_error_clip,
             "rotational_error_clip": rotational_error_clip,
-            "nullspace_target": nullspace_target,
-            "nullspace_stiffness": nullspace_stiffness,
+            "nullspace_tasks": nullspace_tasks,
+            "friction": friction,
             "max_delta_tau": max_delta_tau,
             "lower_joint_limits": lower_joint_limits,
             "upper_joint_limits": upper_joint_limits,
@@ -147,41 +158,103 @@ class CartesianImpedanceTracker:
 
     # --- streaming updates ---
 
-    def set_target(self, pose: Affine, twist: Optional[Twist] = None) -> None:
-        """Update the Cartesian target pose and optional twist (feedforward velocity)."""
-        if twist is not None:
-            self._reference_handle.set(pose, twist)
+    def set_target(
+        self,
+        pose: Affine,
+        twist: Optional[Twist] = None,
+        acceleration: Optional[TwistAcceleration] = None,
+    ) -> None:
+        """Update the Cartesian target pose and optional twist/acceleration feedforward."""
+        if twist is not None or acceleration is not None:
+            self._reference_handle.set(pose, twist, acceleration)
         else:
             self._reference_handle.set(pose)
 
     def set_gains(
         self,
         *,
+        stiffness: Optional[np.ndarray] = None,
+        damping: Optional[np.ndarray] = None,
         translational_stiffness: Optional[float] = None,
         rotational_stiffness: Optional[float] = None,
-        nullspace_stiffness: Optional[float] = None,
+        translational_damping: Optional[float] = None,
+        rotational_damping: Optional[float] = None,
     ) -> None:
         """Update impedance gains. Smoothed in the RT loop via exponential interpolation.
 
-        Only the provided gains are changed; omitted gains keep their current target values.
+        Provide either `stiffness`/`damping` (a 6x6 matrix, or a 6-vector for per-axis gains with
+        no cross-axis coupling) or the isotropic
+        `translational_stiffness`/`rotational_stiffness`/`translational_damping`/`rotational_damping`
+        scalars, not both. Omitted matrix/vector gains keep the current full matrix; omitted scalar
+        gains keep their current value (read off the diagonal of the active stiffness/damping matrix).
         """
         current = self._gains_handle.get() if self._gains_handle.has_gains else None
+
+        if stiffness is not None or damping is not None:
+            if any(
+                v is not None
+                for v in (
+                    translational_stiffness,
+                    rotational_stiffness,
+                    translational_damping,
+                    rotational_damping,
+                )
+            ):
+                raise ValueError(
+                    "Provide either stiffness/damping matrices or the scalar isotropic gains, not both"
+                )
+            self._gains_handle.set(
+                CartesianImpedanceGains(
+                    stiffness=(
+                        np.asarray(stiffness, dtype=float)
+                        if stiffness is not None
+                        else current.stiffness
+                    ),
+                    damping=(
+                        np.asarray(damping, dtype=float)
+                        if damping is not None
+                        else current.damping
+                    ),
+                )
+            )
+            return
+
         ts = (
             translational_stiffness
             if translational_stiffness is not None
-            else (current.translational_stiffness if current else 2000.0)
+            else (current.stiffness[0, 0] if current else 2000.0)
         )
         rs = (
             rotational_stiffness
             if rotational_stiffness is not None
-            else (current.rotational_stiffness if current else 200.0)
+            else (current.stiffness[3, 3] if current else 200.0)
         )
-        ns = (
-            nullspace_stiffness
-            if nullspace_stiffness is not None
-            else (current.nullspace_stiffness if current else 0.0)
+        td = (
+            translational_damping
+            if translational_damping is not None
+            else (
+                current.damping[0, 0]
+                if current and current.damping is not None
+                else None
+            )
         )
-        self._gains_handle.set(ts, rs, ns)
+        rd = (
+            rotational_damping
+            if rotational_damping is not None
+            else (
+                current.damping[3, 3]
+                if current and current.damping is not None
+                else None
+            )
+        )
+        self._gains_handle.set(
+            CartesianImpedanceGains(
+                translational_stiffness=ts,
+                rotational_stiffness=rs,
+                translational_damping=td,
+                rotational_damping=rd,
+            )
+        )
 
     # --- state ---
 
@@ -275,11 +348,7 @@ class JointImpedanceTracker:
         damping: Optional[np.ndarray] = None,
         constant_torque_offset: Optional[np.ndarray] = None,
         compensate_coriolis: bool = True,
-        compensate_friction: bool = False,
-        friction_coulomb: Optional[np.ndarray] = None,
-        friction_viscous: Optional[np.ndarray] = None,
-        friction_max_torque: Optional[np.ndarray] = None,
-        friction_velocity_epsilon: float = 0.03,
+        friction: Optional[FrictionCompensationParams] = None,
         max_delta_tau: float = 1.0,
         lower_joint_limits: Optional[np.ndarray] = None,
         upper_joint_limits: Optional[np.ndarray] = None,
@@ -319,11 +388,7 @@ class JointImpedanceTracker:
             "damping": damping_init,
             "constant_torque_offset": constant_torque_offset,
             "compensate_coriolis": compensate_coriolis,
-            "compensate_friction": compensate_friction,
-            "friction_coulomb": friction_coulomb,
-            "friction_viscous": friction_viscous,
-            "friction_max_torque": friction_max_torque,
-            "friction_velocity_epsilon": friction_velocity_epsilon,
+            "friction": friction,
             "max_delta_tau": max_delta_tau,
             "lower_joint_limits": lower_joint_limits,
             "upper_joint_limits": upper_joint_limits,
