@@ -51,6 +51,76 @@ def lissajous(t: float, base_freq: float):
     return pos, vel, acc
 
 
+def total_duration(base_freq: float, n_repeats: float) -> float:
+    """Wall-clock duration (s) to traverse n_repeats periods of the base frequency,
+    plus a fixed half-cycle ramp up and a fixed half-cycle ramp down."""
+    return (n_repeats + 0.5) / base_freq
+
+
+def trajectory_command(t: float, base_freq: float, n_repeats: float):
+    """Position, linear velocity, and linear acceleration commanded at wall-clock time t.
+
+    Ramps dtraj_dt (the rate of trajectory time relative to wall-clock time) from 0 up
+    to 1 with a smooth half-cosine profile over a fixed half-cycle of the base
+    frequency, holds it at 1 (nominal speed) for a cruise phase, then mirrors the ramp
+    back down to 0 -- covering n_repeats periods of the base frequency in total,
+    independent of duration. The velocity and acceleration feedforwards follow from
+    the chain rule applied to x(t) = lissajous(t_traj(t)):
+      x'(t)  = f'(t_traj) * dtraj_dt
+      x''(t) = f''(t_traj) * dtraj_dt**2 + f'(t_traj) * d2traj_dt2
+    """
+    period = 1.0 / base_freq
+    ramp_time = 0.5 * period
+    cruise_time = n_repeats * period - ramp_time
+
+    if t < ramp_time:
+        tau = t
+        dtraj_dt = 0.5 * (1.0 - np.cos(np.pi * tau / ramp_time))
+        d2traj_dt2 = 0.5 * (np.pi / ramp_time) * np.sin(np.pi * tau / ramp_time)
+        t_traj = 0.5 * tau - 0.5 * (ramp_time / np.pi) * np.sin(np.pi * tau / ramp_time)
+    elif t < ramp_time + cruise_time:
+        tau = t - ramp_time
+        dtraj_dt = 1.0
+        d2traj_dt2 = 0.0
+        t_traj = 0.25 * period + tau
+    else:
+        tau = t - ramp_time - cruise_time
+        dtraj_dt = 0.5 * (1.0 + np.cos(np.pi * tau / ramp_time))
+        d2traj_dt2 = -0.5 * (np.pi / ramp_time) * np.sin(np.pi * tau / ramp_time)
+        t_traj = 0.25 * period + cruise_time + 0.5 * tau + 0.5 * (ramp_time / np.pi) * np.sin(np.pi * tau / ramp_time)
+
+    pos, vel, acc = lissajous(t_traj, base_freq)
+    linear_velocity = vel * dtraj_dt
+    linear_acceleration = acc * dtraj_dt ** 2 + vel * d2traj_dt2
+    return pos, linear_velocity, linear_acceleration
+
+
+def max_linear_speed(base_freq: float, n_repeats: float, n_samples: int = 4000) -> float:
+    """Peak commanded Cartesian linear speed (m/s) over one run of the trajectory."""
+    ts = np.linspace(0.0, total_duration(base_freq, n_repeats), n_samples, endpoint=False)
+    speeds = np.array([np.linalg.norm(trajectory_command(t, base_freq, n_repeats)[1]) for t in ts])
+    return float(speeds.max())
+
+
+def velocity_envelope(robot: Robot, n_repeats: float, base_freq_ref: float = 1.0, target_fraction: float = 1.0):
+    """Base frequency at which the trajectory's peak Cartesian velocity reaches
+    `target_fraction` of the robot's max translational/rotational velocity, whichever
+    binds first.
+    """
+    max_trans_ref = max_linear_speed(base_freq_ref, n_repeats)
+    max_rot_ref = 0.0  # constant orientation -> zero angular velocity target
+
+    trans_limit = robot.translation_velocity_limit.max
+    rot_limit = robot.rotation_velocity_limit.max
+
+    scale_trans = target_fraction * trans_limit / max_trans_ref if max_trans_ref > 1e-9 else np.inf
+    scale_rot = target_fraction * rot_limit / max_rot_ref if max_rot_ref > 1e-9 else np.inf
+
+    if scale_trans <= scale_rot:
+        return base_freq_ref * scale_trans, "translational", trans_limit, rot_limit
+    return base_freq_ref * scale_rot, "rotational", trans_limit, rot_limit
+
+
 def rotation_error_rad(R_target: np.ndarray, R_current: np.ndarray) -> float:
     """Geodesic rotation error magnitude in radians."""
     R_err = R_target @ R_current.T
@@ -74,8 +144,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--speed",
         type=float,
-        default=0.125,
-        help="Base frequency of the Lissajous curve in Hz (default: 0.5)",
+        default=0.3,
+        help="Fraction of the Cartesian velocity envelope to run at. 1.0 drives the "
+        "trajectory's peak translational/rotational Cartesian velocity (whichever "
+        "binds first) to 100%% of the robot's max; 0.5 to 50%%, etc. (default: 0.3)",
     )
     parser.add_argument(
         "--trans-stiff",
@@ -100,11 +172,11 @@ if __name__ == "__main__":
         help="Enable the model-based inertial acceleration feedforward (Lambda(q) * ddx_d)",
     )
     parser.add_argument(
-        "--duration",
+        "--repeats",
         type=float,
-        default=None,
-        help="Tracking duration in seconds.  Defaults to two full cycles of the "
-        "slowest Lissajous frequency.",
+        default=2.0,
+        help="Number of Lissajous periods (at the base frequency) to traverse, on top "
+        "of a fixed half-cycle ramp up and half-cycle ramp down (default: 2.0)",
     )
     parser.add_argument(
         "--append-tsv",
@@ -113,9 +185,8 @@ if __name__ == "__main__":
         help="Append a result row to this TSV file (creates header if new).",
     )
     args = parser.parse_args()
-
-    base_freq: float = args.speed
-    duration: float = args.duration if args.duration is not None else 2.0 / base_freq
+    if args.repeats < 0.5:
+        parser.error("--repeats must be at least 0.5 (the ramp up/down alone cover half a cycle each)")
 
     robot = Robot(args.host)
     robot.recover_from_errors()
@@ -123,6 +194,23 @@ if __name__ == "__main__":
         torque_thresholds=[35.0, 35.0, 35.0, 35.0, 35.0, 35.0, 35.0],
         force_thresholds=[60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
     )
+
+    # Calibrate the envelope on a base_freq_ref=1.0 reference trajectory covering the
+    # same --repeats, then let --speed pick a fraction of that envelope. The ramp
+    # up/down are fixed at half a cycle of the base frequency, so the trajectory shape
+    # in normalized time (t * base_freq) is identical between the reference and the
+    # actual run regardless of base_freq -- the peak velocity scales exactly linearly
+    # with base_freq and the envelope is hit precisely.
+    envelope_base_freq, binding_axis, trans_limit, rot_limit = velocity_envelope(robot, args.repeats)
+    base_freq: float = args.speed * envelope_base_freq
+    duration: float = total_duration(base_freq, args.repeats)
+
+    print(
+        f"Velocity envelope: 100% of {trans_limit:.2f} m/s trans / {rot_limit:.2f} rad/s rot "
+        f"reached at base_freq={envelope_base_freq:.4f} Hz (binding: {binding_axis})"
+    )
+    print(f"speed={args.speed:.2f}x -> base_freq={base_freq:.4f} Hz, duration={duration:.2f} s")
+
     # --- move to start configuration -----------------------------------------
     print("Moving to start joint configuration …")
     robot.move(JointMotion(_START_JOINTS, reference_type=ReferenceType.Absolute, relative_dynamics_factor=0.1))
@@ -160,7 +248,7 @@ if __name__ == "__main__":
     curve_positions = np.array([lissajous(t, base_freq)[0] for t in _t_curve])
 
     print(
-        f"Tracking Lissajous for {duration:.1f} s  "
+        f"Tracking Lissajous for {args.repeats:.2f} cycles + ramps ({duration:.1f} s total)  "
         f"(trans_stiff={args.trans_stiff:.0f} N/m, "
         f"rot_stiff={args.rot_stiff:.0f} Nm/rad, "
         f"friction={'on' if args.friction else 'off'}, "
@@ -183,22 +271,8 @@ if __name__ == "__main__":
             if t >= duration:
                 break
 
-            # Sinusoidal ease-in/ease-out: remap wall-clock t onto trajectory
-            # time t_traj so that d(t_traj)/dt = 0 at both ends. The velocity and
-            # acceleration feedforwards follow from the chain rule applied to
-            # x(t) = lissajous(t_traj(t)):
-            #   x'(t)  = f'(t_traj) · dtraj_dt
-            #   x''(t) = f''(t_traj) · dtraj_dt² + f'(t_traj) · d2traj_dt2
-            t_norm = t / duration
-            s_norm = t_norm - np.sin(2.0 * np.pi * t_norm) / (2.0 * np.pi)
-            t_traj = s_norm * duration
-            dtraj_dt = 1.0 - np.cos(2.0 * np.pi * t_norm)
-            d2traj_dt2 = (2.0 * np.pi / duration) * np.sin(2.0 * np.pi * t_norm)
-
-            target_pos, target_vel, target_acc = lissajous(t_traj, base_freq)
+            target_pos, linear_velocity, linear_acceleration = trajectory_command(t, base_freq, args.repeats)
             target_pose = Affine(target_pos, orientation)
-            linear_velocity = target_vel * dtraj_dt
-            linear_acceleration = target_acc * dtraj_dt ** 2 + target_vel * d2traj_dt2
             target_twist = Twist(
                 linear_velocity=linear_velocity,
                 angular_velocity=np.zeros(3),
