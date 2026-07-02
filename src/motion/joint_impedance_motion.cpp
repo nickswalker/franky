@@ -10,16 +10,25 @@
 namespace franky {
 
 JointImpedanceBase::JointImpedanceBase(
-    const Vector7d &target, const Vector7d &target_velocity, const JointImpedanceParams &params,
-    std::shared_ptr<JointImpedanceGainsHandle> gains_handle, double gains_time_constant)
+    const Vector7d &target, const Vector7d &target_velocity, const JointImpedanceParams &params)
+    : JointImpedanceBase(target, target_velocity, params, RuntimeOptions{}) {}
+
+JointImpedanceBase::JointImpedanceBase(
+    const Vector7d &target, const Vector7d &target_velocity, const JointImpedanceParams &params, RuntimeOptions runtime)
     : Motion<franka::Torques>(),
       params_(params),
       target_(target),
       target_velocity_(target_velocity),
-      gains_handle_(std::move(gains_handle)),
-      gains_time_constant_(gains_time_constant),
+      gains_handle_(std::move(runtime.gains_handle)),
+      cartesian_gains_handle_(std::move(runtime.cartesian_gains_handle)),
+      gains_time_constant_(runtime.gains_time_constant),
       current_stiffness_(params.stiffness),
-      current_damping_(params.damping) {}
+      current_damping_(params.damping) {
+  if (params.cartesian_gains.has_value()) {
+    const auto &cartesian_gains = *params.cartesian_gains;
+    hybrid_ = HybridState{cartesian_gains.stiffness, cartesian_gains.damping};
+  }
+}
 
 JointImpedanceMotion::JointImpedanceMotion(const Vector7d &target) : JointImpedanceMotion(target, Params{}) {}
 
@@ -55,13 +64,39 @@ franka::Torques JointImpedanceBase::computeCommand(
 
   Vector7d torque_feedforward = params_.constant_torque_offset + reference.tau_ff;
   const Vector7d q_error = (reference.q - robot_state.q).cwiseMax(-params_.error_clip).cwiseMin(params_.error_clip);
-  Vector7d tau_d = current_stiffness_.asDiagonal() * q_error +
-                   current_damping_.asDiagonal() * (reference.dq - robot_state.dq) + torque_feedforward;
+  auto model = robot()->model();
+
+  Vector7d tau_d;
+  if (hybrid_.has_value()) {
+    // If a gains handle is present, interpolate toward the target Cartesian gains.
+    if (cartesian_gains_handle_ && cartesian_gains_handle_->hasGains()) {
+      const auto target_gains = cartesian_gains_handle_->get();
+      const double alpha = 1.0 - std::exp(-dt / gains_time_constant_);
+      hybrid_->stiffness += alpha * (target_gains.stiffness - hybrid_->stiffness);
+      if (target_gains.damping.has_value()) {
+        const Vector6d current_damping = hybrid_->damping.value_or(2.0 * hybrid_->stiffness.cwiseSqrt());
+        hybrid_->damping = current_damping + alpha * (*target_gains.damping - current_damping);
+      } else {
+        hybrid_->damping = std::nullopt;
+      }
+    }
+    const Vector6d hybrid_damping = hybrid_->damping.value_or(2.0 * hybrid_->stiffness.cwiseSqrt());
+
+    const Jacobian jacobian = model->zeroJacobian(franka::Frame::kEndEffector, robot_state);
+    const Eigen::Matrix<double, 7, 7> stiffness_eff = current_stiffness_.asDiagonal().toDenseMatrix() +
+                                                      jacobian.transpose() * hybrid_->stiffness.asDiagonal() * jacobian;
+    const Eigen::Matrix<double, 7, 7> damping_eff =
+        current_damping_.asDiagonal().toDenseMatrix() + jacobian.transpose() * hybrid_damping.asDiagonal() * jacobian;
+    tau_d = stiffness_eff * q_error + damping_eff * (reference.dq - robot_state.dq) + torque_feedforward;
+  } else {
+    tau_d = current_stiffness_.asDiagonal() * q_error +
+            current_damping_.asDiagonal() * (reference.dq - robot_state.dq) + torque_feedforward;
+  }
 
   tau_d += computeFrictionCompensation(robot_state.dq, params_.friction);
 
   if (params_.safety.lower_joint_limits.has_value() && params_.safety.upper_joint_limits.has_value()) {
-    tau_d += franky::computeJointLimitTorque(
+    tau_d += computeJointLimitTorque(
         robot_state.q,
         robot_state.dq,
         *params_.safety.lower_joint_limits,
@@ -72,9 +107,8 @@ franka::Torques JointImpedanceBase::computeCommand(
         params_.safety.joint_limit_max_torque);
   }
 
-  auto model = robot()->model();
   if (params_.compensate_coriolis) tau_d += model->coriolis(robot_state);
-  tau_d = franky::saturateTorqueRate(tau_d, robot_state.tau_J_d, params_.safety.max_delta_tau);
+  tau_d = saturateTorqueRate(tau_d, robot_state.tau_J_d, params_.safety.max_delta_tau);
 
   std::array<double, 7> tau_d_array{};
   Eigen::VectorXd::Map(tau_d_array.data(), 7) = tau_d;
