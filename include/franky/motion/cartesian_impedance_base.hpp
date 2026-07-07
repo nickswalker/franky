@@ -4,7 +4,6 @@
 #include <Eigen/Geometry>
 #include <Eigen/SVD>
 #include <array>
-#include <atomic>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,6 +13,7 @@
 #include "franky/motion/impedance_gains_handle.hpp"
 #include "franky/motion/motion.hpp"
 #include "franky/motion/torque_control_utils.hpp"
+#include "franky/realtime_value.hpp"
 #include "franky/robot_pose.hpp"
 #include "franky/twist.hpp"
 #include "franky/twist_acceleration.hpp"
@@ -112,28 +112,28 @@ struct NullspaceGains {
 };
 
 /**
- * @brief Double-buffered handle for updating nullspace task gains online.
+ * @brief Handle for updating nullspace task gains online (see RealtimeValue).
  *
- * Constructed from a task vector to seed the initial gains. set() writes to
- * the inactive buffer and flips the active index; each controller consumes only
- * the named sections corresponding to its configured nullspace tasks.
+ * Constructed from a task vector to seed the initial gains; each controller
+ * consumes only the named sections corresponding to its configured nullspace
+ * tasks.
  *
- * Thread safety: at most one thread may call set() or clear() at a time.
- * Concurrent reads from the RT callback via activeGains() and hasGains() are safe.
+ * Thread safety: at most one thread may call set() or clear() at a time (the
+ * writer), and activeGains() is reserved for the single RT reader. hasGains()
+ * is safe from either thread.
  */
 class NullspaceGainsHandle {
  public:
   explicit NullspaceGainsHandle(const std::vector<NullspaceTask> &tasks);
 
-  void set(const NullspaceGains &gains);
-  void clear();
-  [[nodiscard]] bool hasGains() const;
-  [[nodiscard]] const NullspaceGains &activeGains() const;
+  void set(const NullspaceGains &gains) { value_.set(gains); }
+  void clear() { value_.clear(); }
+  [[nodiscard]] bool hasGains() const { return value_.hasValue(); }
+  //! Latest published gains; the reference stays valid until the next call. RT reader thread only.
+  [[nodiscard]] const NullspaceGains &activeGains() const { return value_.get(); }
 
  private:
-  std::array<NullspaceGains, 2> buffers_{};
-  std::atomic<uint8_t> active_index_{0};
-  std::atomic<bool> valid_{false};
+  RealtimeValue<NullspaceGains> value_;
 };
 
 /**

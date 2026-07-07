@@ -1,11 +1,10 @@
 #pragma once
 
 #include <Eigen/Eigenvalues>
-#include <array>
-#include <atomic>
 #include <cmath>
 #include <optional>
 
+#include "franky/realtime_value.hpp"
 #include "franky/types.hpp"
 
 namespace franky {
@@ -91,14 +90,14 @@ struct CartesianImpedanceGains {
 };
 
 /**
- * @brief Double-buffered handle for updating Cartesian impedance gains online.
+ * @brief Handle for updating Cartesian impedance gains online (see RealtimeValue).
  *
- * Same lock-free pattern as CartesianReferenceHandle. The RT loop reads the
- * target gains each cycle and exponentially interpolates toward them, so
- * stiffness changes are smooth rather than instantaneous.
+ * The RT loop reads the target gains each cycle and exponentially interpolates
+ * toward them, so stiffness changes are smooth rather than instantaneous.
  *
- * Thread safety: at most one thread may call set() or clear() at a time.
- * Concurrent reads from the RT callback via get() and hasGains() are safe.
+ * Thread safety: at most one thread may call set(), clear(), or lastSet() at a
+ * time (the writer), and get() is reserved for the single RT reader. hasGains()
+ * is safe from either thread.
  */
 class CartesianImpedanceGainsHandle {
  public:
@@ -106,15 +105,20 @@ class CartesianImpedanceGainsHandle {
 
   CartesianImpedanceGainsHandle() = default;
 
-  void set(const CartesianImpedanceGains &gains);
-  void clear();
-  [[nodiscard]] bool hasGains() const;
-  [[nodiscard]] CartesianImpedanceGains get() const;
+  void set(const CartesianImpedanceGains &gains) {
+    last_set_ = gains;
+    value_.set(gains);
+  }
+  void clear() { value_.clear(); }
+  [[nodiscard]] bool hasGains() const { return value_.hasValue(); }
+  //! Latest published gains. RT reader thread only.
+  [[nodiscard]] const CartesianImpedanceGains &get() const { return value_.get(); }
+  //! The value most recently passed to set(). Writer thread only.
+  [[nodiscard]] CartesianImpedanceGains lastSet() const { return last_set_; }
 
  private:
-  std::array<CartesianImpedanceGains, 2> buffers_{};
-  std::atomic<uint8_t> active_index_{0};
-  std::atomic<bool> valid_{false};
+  RealtimeValue<CartesianImpedanceGains> value_;
+  CartesianImpedanceGains last_set_{};
 };
 
 /**
@@ -128,10 +132,11 @@ struct JointImpedanceGains {
 };
 
 /**
- * @brief Double-buffered handle for updating joint impedance gains online.
+ * @brief Handle for updating joint impedance gains online (see RealtimeValue).
  *
- * Thread safety: at most one thread may call set() or clear() at a time.
- * Concurrent reads from the RT callback via get() and hasGains() are safe.
+ * Thread safety: at most one thread may call set(), clear(), or lastSet() at a
+ * time (the writer), and get() is reserved for the single RT reader. hasGains()
+ * is safe from either thread.
  */
 class JointImpedanceGainsHandle {
  public:
@@ -139,15 +144,20 @@ class JointImpedanceGainsHandle {
 
   JointImpedanceGainsHandle() = default;
 
-  void set(const JointImpedanceGains &gains);
-  void clear();
-  [[nodiscard]] bool hasGains() const;
-  [[nodiscard]] JointImpedanceGains get() const;
+  void set(const JointImpedanceGains &gains) {
+    last_set_ = gains;
+    value_.set(gains);
+  }
+  void clear() { value_.clear(); }
+  [[nodiscard]] bool hasGains() const { return value_.hasValue(); }
+  //! Latest published gains. RT reader thread only.
+  [[nodiscard]] const JointImpedanceGains &get() const { return value_.get(); }
+  //! The value most recently passed to set(). Writer thread only.
+  [[nodiscard]] JointImpedanceGains lastSet() const { return last_set_; }
 
  private:
-  std::array<JointImpedanceGains, 2> buffers_{};
-  std::atomic<uint8_t> active_index_{0};
-  std::atomic<bool> valid_{false};
+  RealtimeValue<JointImpedanceGains> value_;
+  JointImpedanceGains last_set_{};
 };
 
 /**
@@ -170,12 +180,11 @@ struct HybridCartesianGains {
 };
 
 /**
- * @brief Double-buffered handle for updating hybrid Cartesian gains online.
+ * @brief Handle for updating hybrid Cartesian gains online (see RealtimeValue).
  *
- * Same lock-free pattern as JointImpedanceGainsHandle.
- *
- * Thread safety: at most one thread may call set() or clear() at a time.
- * Concurrent reads from the RT callback via get() and hasGains() are safe.
+ * Thread safety: at most one thread may call set(), clear(), or lastSet() at a
+ * time (the writer), and get() is reserved for the single RT reader. hasGains()
+ * is safe from either thread.
  */
 class HybridCartesianGainsHandle {
  public:
@@ -183,15 +192,20 @@ class HybridCartesianGainsHandle {
 
   HybridCartesianGainsHandle() = default;
 
-  void set(const HybridCartesianGains &gains);
-  void clear();
-  [[nodiscard]] bool hasGains() const;
-  [[nodiscard]] HybridCartesianGains get() const;
+  void set(const HybridCartesianGains &gains) {
+    last_set_ = gains;
+    value_.set(gains);
+  }
+  void clear() { value_.clear(); }
+  [[nodiscard]] bool hasGains() const { return value_.hasValue(); }
+  //! Latest published gains. RT reader thread only.
+  [[nodiscard]] const HybridCartesianGains &get() const { return value_.get(); }
+  //! The value most recently passed to set(). Writer thread only.
+  [[nodiscard]] HybridCartesianGains lastSet() const { return last_set_; }
 
  private:
-  std::array<HybridCartesianGains, 2> buffers_{};
-  std::atomic<uint8_t> active_index_{0};
-  std::atomic<bool> valid_{false};
+  RealtimeValue<HybridCartesianGains> value_;
+  HybridCartesianGains last_set_{};
 };
 
 }  // namespace franky

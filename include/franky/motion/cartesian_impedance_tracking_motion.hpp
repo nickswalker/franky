@@ -1,39 +1,38 @@
 #pragma once
 
-#include <array>
-#include <atomic>
 #include <functional>
 #include <memory>
 
 #include "franky/motion/cartesian_impedance_base.hpp"
 #include "franky/motion/impedance_gains_handle.hpp"
+#include "franky/realtime_value.hpp"
 
 namespace franky {
 
 /**
- * @brief Double-buffered handle for updating a CartesianReference online.
+ * @brief Handle for updating a CartesianReference online (see RealtimeValue).
  *
  * This handle is intended to be written from a user thread while a single
  * CartesianImpedanceTrackingMotion is running. The motion reads the latest
  * valid reference each control cycle without needing to replace the motion
  * object.
  *
- * Thread safety: at most one thread may call set() or clear() at a time.
- * Concurrent reads from the RT callback via get() and hasReference() are safe.
+ * Thread safety: at most one thread may call set() or clear() at a time (the
+ * writer), and get() is reserved for the single RT reader. hasReference() is
+ * safe from either thread.
  */
 class CartesianReferenceHandle {
  public:
   CartesianReferenceHandle() = default;
 
-  void set(const CartesianReference &reference);
-  void clear();
-  [[nodiscard]] bool hasReference() const;
-  [[nodiscard]] CartesianReference get() const;
+  void set(const CartesianReference &reference) { value_.set(reference); }
+  void clear() { value_.clear(); }
+  [[nodiscard]] bool hasReference() const { return value_.hasValue(); }
+  //! Latest published reference. RT reader thread only.
+  [[nodiscard]] const CartesianReference &get() const { return value_.get(); }
 
  private:
-  std::array<CartesianReference, 2> buffers_{};
-  std::atomic<uint8_t> active_index_{0};
-  std::atomic<bool> valid_{false};
+  RealtimeValue<CartesianReference> value_;
 };
 
 /**
@@ -57,6 +56,15 @@ class CartesianImpedanceTrackingMotion : public CartesianImpedanceBase {
 
   [[nodiscard]] const Params &params() const { return base_params(); }
 
+  // target() intentionally shadows
+  // the by-value accessor on CartesianImpedanceBase, which reflects the static absolute_target_ and
+  // is meaningless for a tracking motion.
+  [[nodiscard]] Affine target() const { return applied_reference_.get().target; }
+  [[nodiscard]] std::optional<Twist> target_twist() const { return applied_reference_.get().target_twist; }
+  [[nodiscard]] std::optional<TwistAcceleration> target_acceleration() const {
+    return applied_reference_.get().target_acceleration;
+  }
+
  protected:
   void initImpl(const RobotState &robot_state, const std::optional<franka::Torques> &previous_command) override;
   std::tuple<CartesianReference, bool> update(
@@ -69,6 +77,8 @@ class CartesianImpedanceTrackingMotion : public CartesianImpedanceBase {
   Affine target_;
   std::optional<Twist> target_twist_;
   std::optional<TwistAcceleration> target_acceleration_;
+
+  RealtimeValue<CartesianReference> applied_reference_;
 };
 
 }  // namespace franky

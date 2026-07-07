@@ -1,12 +1,11 @@
 #pragma once
 
-#include <array>
-#include <atomic>
 #include <functional>
 #include <memory>
 
 #include "franky/motion/impedance_gains_handle.hpp"
 #include "franky/motion/joint_impedance_motion.hpp"
+#include "franky/realtime_value.hpp"
 
 namespace franky {
 
@@ -25,14 +24,15 @@ struct JointReference {
 };
 
 /**
- * @brief Double-buffered handle for updating a JointReference online.
+ * @brief Handle for updating a JointReference online (see RealtimeValue).
  *
  * This handle is intended to be written from a user thread while a single
  * JointImpedanceTrackingMotion is running. The motion reads the latest valid
  * reference each control cycle without needing to replace the motion object.
  *
- * Thread safety: at most one thread may call set() or clear() at a time.
- * Concurrent reads from the RT callback via get() and hasReference() are safe.
+ * Thread safety: at most one thread may call set() or clear() at a time (the
+ * writer), and get() is reserved for the single RT reader. hasReference() is
+ * safe from either thread.
  */
 class JointReferenceHandle {
  public:
@@ -43,27 +43,25 @@ class JointReferenceHandle {
   /**
    * @brief Publish a new joint-space reference for the running motion.
    */
-  void set(const JointReference &reference);
+  void set(const JointReference &reference) { value_.set(reference); }
 
   /**
    * @brief Mark the handle as having no externally supplied reference.
    */
-  void clear();
+  void clear() { value_.clear(); }
 
   /**
    * @brief Whether a valid reference is currently available.
    */
-  [[nodiscard]] bool hasReference() const;
+  [[nodiscard]] bool hasReference() const { return value_.hasValue(); }
 
   /**
-   * @brief Get the most recently published reference.
+   * @brief The most recently published reference. RT reader thread only.
    */
-  [[nodiscard]] JointReference get() const;
+  [[nodiscard]] const JointReference &get() const { return value_.get(); }
 
  private:
-  std::array<JointReference, 2> buffers_{};
-  std::atomic<uint8_t> active_index_{0};
-  std::atomic<bool> valid_{false};
+  RealtimeValue<JointReference> value_;
 };
 
 /**
@@ -85,6 +83,13 @@ class JointImpedanceTrackingMotion : public JointImpedanceBase {
   explicit JointImpedanceTrackingMotion(ReferenceCallback reference_callback);
   JointImpedanceTrackingMotion(ReferenceCallback reference_callback, const Params &params);
 
+  // These intentionally shadow the by-reference accessors on JointImpedanceBase and return by
+  // value. In a tracking motion the applied reference is rewritten every cycle on the RT thread,
+  // so a Python reader copying a raw member reference could observe a vector torn across two
+  // cycles. Reading through the wait-free RealtimeValue instead yields a coherent snapshot.
+  [[nodiscard]] Vector7d target() const { return applied_reference_.get().q; }
+  [[nodiscard]] Vector7d target_velocity() const { return applied_reference_.get().dq; }
+
  protected:
   void initImpl(const RobotState &robot_state, const std::optional<franka::Torques> &previous_command) override;
   franka::Torques nextCommandImpl(
@@ -94,6 +99,8 @@ class JointImpedanceTrackingMotion : public JointImpedanceBase {
  private:
   std::shared_ptr<JointReferenceHandle> reference_handle_;
   ReferenceCallback reference_callback_;
+
+  RealtimeValue<JointReference> applied_reference_;
 };
 
 }  // namespace franky

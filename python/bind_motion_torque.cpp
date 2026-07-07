@@ -1049,5 +1049,8 @@ and .diagonal for convenience constructors), independent of how the initial gain
           "nullspace_tasks"_a = py::list(),
           "friction"_a = std::nullopt,
           "nullspace_gains_handle"_a = nullptr)
+      .def_property_readonly("target", &CartesianImpedanceTrackingMotion::target)
+      .def_property_readonly("target_twist", &CartesianImpedanceTrackingMotion::target_twist)
+      .def_property_readonly("target_acceleration", &CartesianImpedanceTrackingMotion::target_acceleration)
       .def_property_readonly("params", [](const CartesianImpedanceTrackingMotion &m) { return m.params(); });
 }

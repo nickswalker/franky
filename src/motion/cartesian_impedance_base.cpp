@@ -78,26 +78,8 @@ std::optional<T> lerpOptionalDamping(
 }
 }  // namespace
 
-NullspaceGainsHandle::NullspaceGainsHandle(const std::vector<NullspaceTask> &tasks) : buffers_{} {
-  const auto initial_gains = nullspaceGainsFromTasks(tasks);
-  buffers_[0] = initial_gains;
-  buffers_[1] = initial_gains;
-}
-
-void NullspaceGainsHandle::set(const NullspaceGains &gains) {
-  const uint8_t next_index = 1 - active_index_.load(std::memory_order_relaxed);
-  buffers_[next_index] = gains;
-  active_index_.store(next_index, std::memory_order_release);
-  valid_.store(true, std::memory_order_release);
-}
-
-void NullspaceGainsHandle::clear() { valid_.store(false, std::memory_order_release); }
-
-bool NullspaceGainsHandle::hasGains() const { return valid_.load(std::memory_order_acquire); }
-
-const NullspaceGains &NullspaceGainsHandle::activeGains() const {
-  return buffers_[active_index_.load(std::memory_order_acquire)];
-}
+NullspaceGainsHandle::NullspaceGainsHandle(const std::vector<NullspaceTask> &tasks)
+    : value_(nullspaceGainsFromTasks(tasks)) {}
 
 namespace {
 

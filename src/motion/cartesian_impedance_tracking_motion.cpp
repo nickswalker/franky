@@ -5,22 +5,6 @@
 
 namespace franky {
 
-void CartesianReferenceHandle::set(const CartesianReference &reference) {
-  const uint8_t next_index = 1 - active_index_.load(std::memory_order_relaxed);
-  buffers_[next_index] = reference;
-  active_index_.store(next_index, std::memory_order_release);
-  valid_.store(true, std::memory_order_release);
-}
-
-void CartesianReferenceHandle::clear() { valid_.store(false, std::memory_order_release); }
-
-bool CartesianReferenceHandle::hasReference() const { return valid_.load(std::memory_order_acquire); }
-
-CartesianReference CartesianReferenceHandle::get() const {
-  const uint8_t active_index = active_index_.load(std::memory_order_acquire);
-  return buffers_[active_index];
-}
-
 CartesianImpedanceTrackingMotion::CartesianImpedanceTrackingMotion(
     std::shared_ptr<CartesianReferenceHandle> reference_handle)
     : CartesianImpedanceTrackingMotion(std::move(reference_handle), Params()) {}
@@ -63,6 +47,7 @@ void CartesianImpedanceTrackingMotion::initImpl(
     target_twist_ = reference.target_twist;
     target_acceleration_ = reference.target_acceleration;
   }
+  applied_reference_.set(CartesianReference{target_, target_twist_, target_acceleration_});
 }
 
 std::tuple<CartesianReference, bool> CartesianImpedanceTrackingMotion::update(
@@ -78,7 +63,9 @@ std::tuple<CartesianReference, bool> CartesianImpedanceTrackingMotion::update(
     target_twist_ = reference.target_twist;
     target_acceleration_ = reference.target_acceleration;
   }
-  return {CartesianReference{target_, target_twist_, target_acceleration_}, false};
+  CartesianReference reference{target_, target_twist_, target_acceleration_};
+  applied_reference_.set(reference);
+  return {reference, false};
 }
 
 }  // namespace franky
