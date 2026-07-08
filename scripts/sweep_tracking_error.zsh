@@ -13,18 +13,11 @@ set -u
 
 TSV=${TSV:-data/tracking_metrics.tsv}
 
-speeds=(0.25 0.125)
-frictions=(true)
+speeds=(0.375 0.25 0.125)
+frictions=(true false)
 inertial_ffs=(true false)
 trans_stiffs=(250 500 750 1000 1500 2000)
-rot_stiffs=(7.5 15 30 45 60)
-
-# Skip combos known to be unstable.
-skip_run() {
-  local s=$1 t=$2 r=$3
-  [[ $s == 0.5 ]] && (( r > 30 )) && return 0
-  return 1
-}
+rot_stiffs=(7.5 15 30 45)
 
 # Resume support: collect keys already present in the TSV.
 typeset -A done
@@ -60,10 +53,6 @@ for s in $speeds; do
       for t in $trans_stiffs; do
         for r in $rot_stiffs; do
           i=$(( i + 1 ))
-          if skip_run $s $t $r; then
-            print "[$i/$total] skip (unstable): speed=$s trans=$t rot=$r"
-            continue
-          fi
           key="${s}|${t}|${r}|${f}|${ff}"
           if [[ -n ${done[$key]:-} ]]; then
             print "[$i/$total] skip (done): speed=$s friction=$f ff=$ff trans=$t rot=$r"
@@ -74,7 +63,7 @@ for s in $speeds; do
           [[ $f == true ]] && friction_flag=(--friction)
           inertial_flag=()
           [[ $ff == true ]] && inertial_flag=(--inertial-ff)
-          uv run examples/tracking_error.py \
+          uv run ../examples/tracking_error.py \
             --speed "$s" \
             --trans-stiff "$t" \
             --rot-stiff "$r" \

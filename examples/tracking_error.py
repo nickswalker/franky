@@ -328,6 +328,7 @@ if __name__ == "__main__":
         _COLUMNS = [
             "timestamp", "episode", "tracker", "direction",
             "speed", "translational_stiffness", "rotational_stiffness", "nullspace_stiffness",
+            "cartesian_stiffness", "cartesian_rotational_stiffness",
             "friction_comp", "friction_coulomb", "friction_viscous", "friction_max_torque", "friction_velocity_epsilon",
             "inertial_ff",
             "pos_mean_mm", "pos_rms_mm", "pos_max_mm", "pos_endpoint_mm",

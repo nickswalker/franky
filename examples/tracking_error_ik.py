@@ -146,6 +146,21 @@ if __name__ == "__main__":
         "distal joints are scaled proportionally (default: 320)",
     )
     parser.add_argument(
+        "--cartesian-stiffness",
+        type=float,
+        default=None,
+        help="Enable hybrid Cartesian gain shaping with this translational Cartesian "
+        "stiffness in N/m (applied to the x/y/z axes). Omit to run pure joint "
+        "impedance. See --cartesian-rotational-stiffness for the rx/ry/rz axes.",
+    )
+    parser.add_argument(
+        "--cartesian-rotational-stiffness",
+        type=float,
+        default=0.0,
+        help="Rotational Cartesian stiffness in Nm/rad (applied to the rx/ry/rz axes) "
+        "when --cartesian-stiffness is set (default: 0)",
+    )
+    parser.add_argument(
         "--friction",
         action="store_true",
         help="Enable friction compensation",
@@ -320,9 +335,19 @@ if __name__ == "__main__":
     _t_curve = np.arange(0.0, 1.0 / base_freq, _PERIOD)
     curve_positions = np.array([lissajous(t, base_freq)[0] for t in _t_curve])
 
+    # Hybrid Cartesian gain shaping: when --cartesian-stiffness is set, the joint
+    # impedance controller additionally applies J^T diag(k_cart) J on top of the
+    # joint-space stiffness. Damping is left at the controller's critical default.
+    cartesian_stiffness = None
+    if args.cartesian_stiffness is not None:
+        cs = args.cartesian_stiffness
+        crs = args.cartesian_rotational_stiffness
+        cartesian_stiffness = np.array([cs, cs, cs, crs, crs, crs], dtype=float)
+
     print(
         f"Tracking Lissajous for {duration:.1f} s  "
         f"(stiffness={args.stiffness:.0f} Nm/rad peak, "
+        f"cartesian_stiffness={'off' if cartesian_stiffness is None else f'{args.cartesian_stiffness:.0f} N/m trans / {args.cartesian_rotational_stiffness:.0f} Nm/rad rot'}, "
         f"friction={'on' if args.friction else 'off'})"
     )
 
@@ -334,6 +359,7 @@ if __name__ == "__main__":
     with JointImpedanceTracker(
         robot,
         stiffness=stiffness,
+        cartesian_stiffness=cartesian_stiffness,
         friction=friction,
         period=_PERIOD,
     ) as tracker:
@@ -385,6 +411,7 @@ if __name__ == "__main__":
         _COLUMNS = [
             "timestamp", "episode", "tracker", "direction",
             "speed", "translational_stiffness", "rotational_stiffness", "nullspace_stiffness",
+            "cartesian_stiffness", "cartesian_rotational_stiffness",
             "friction_comp", "friction_coulomb", "friction_viscous", "friction_max_torque", "friction_velocity_epsilon",
             "inertial_ff",
             "pos_mean_mm", "pos_rms_mm", "pos_max_mm", "pos_endpoint_mm",
@@ -413,12 +440,18 @@ if __name__ == "__main__":
         row = {
             "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
             "episode": "",
-            "tracker": "joint_ik",
+            "tracker": "joint_ik_hybrid" if cartesian_stiffness is not None else "joint_ik",
             "direction": "forward",
             "speed": args.speed,
             "translational_stiffness": args.stiffness,
             "rotational_stiffness": "",
             "nullspace_stiffness": "",
+            "cartesian_stiffness": (
+                f"{args.cartesian_stiffness:g}" if cartesian_stiffness is not None else ""
+            ),
+            "cartesian_rotational_stiffness": (
+                f"{args.cartesian_rotational_stiffness:g}" if cartesian_stiffness is not None else ""
+            ),
             "friction_comp": str(args.friction).lower(),
             "friction_coulomb": _vec(friction.coulomb) if friction else "",
             "friction_viscous": _vec(friction.viscous) if friction else "",
