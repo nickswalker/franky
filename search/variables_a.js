@@ -1,12 +1,15 @@
 var searchData=
 [
-  ['o_5fddp_5fee_5fc_0',['O_ddP_EE_c',['../structfranky_1_1_robot_state.html#a3856ba38e33b30a04b7cca16509debde',1,'franky::RobotState']]],
-  ['o_5fddp_5fee_5fest_1',['O_ddP_EE_est',['../structfranky_1_1_robot_state.html#a3a35fa21dfce2110e06f3b2476f9734e',1,'franky::RobotState']]],
-  ['o_5fdp_5fee_5fc_2',['O_dP_EE_c',['../structfranky_1_1_robot_state.html#aa67ffe8b93078f07f4a3b36bb00650ad',1,'franky::RobotState']]],
-  ['o_5fdp_5fee_5fd_3',['O_dP_EE_d',['../structfranky_1_1_robot_state.html#aa4d24e043152f36d3ad2c3d55e0a0eac',1,'franky::RobotState']]],
-  ['o_5fdp_5fee_5fest_4',['O_dP_EE_est',['../structfranky_1_1_robot_state.html#aa05402a790846ad287e136b0364359c6',1,'franky::RobotState']]],
-  ['o_5ff_5fext_5fhat_5fk_5',['O_F_ext_hat_K',['../structfranky_1_1_robot_state.html#acac3a6e1b9e7f6e19c19aa5df3740b1c',1,'franky::RobotState']]],
-  ['o_5ft_5fee_6',['O_T_EE',['../structfranky_1_1_robot_state.html#a0a9667e0d76a3901c0e9393a8b227c0a',1,'franky::RobotState']]],
-  ['o_5ft_5fee_5fc_7',['O_T_EE_c',['../structfranky_1_1_robot_state.html#aebb25f8a7c0e6b72f2a5f1829a97ea43',1,'franky::RobotState']]],
-  ['o_5ft_5fee_5fd_8',['O_T_EE_d',['../structfranky_1_1_robot_state.html#a9650368f3c772ed7d46f07f6412b3faf',1,'franky::RobotState']]]
+  ['m_5fee_0',['m_ee',['../structfranky_1_1_robot_state.html#aa5104cf1e290f362c032dd3099191bd8',1,'franky::RobotState']]],
+  ['m_5fload_1',['m_load',['../structfranky_1_1_robot_state.html#ac7f17c8d7d1bb49658c872904caa8233',1,'franky::RobotState']]],
+  ['m_5ftotal_2',['m_total',['../structfranky_1_1_robot_state.html#a8e8ddca4a286bfb33aa94bfbafc7666d',1,'franky::RobotState']]],
+  ['manipulability_5fdamping_3',['manipulability_damping',['../structfranky_1_1_nullspace_gains.html#a533b43aa8bb6b5f2c41607a8fa3e5b4a',1,'franky::NullspaceGains']]],
+  ['manipulability_5fgain_4',['manipulability_gain',['../structfranky_1_1_nullspace_gains.html#a52c57c83d3753a0c26495d4b61c3e68f',1,'franky::NullspaceGains']]],
+  ['manipulability_5fmax_5ftorque_5',['manipulability_max_torque',['../structfranky_1_1_nullspace_gains.html#ab61645291718ffea84a1f86ae1f7a69a',1,'franky::NullspaceGains']]],
+  ['max_6',['max',['../classfranky_1_1_dynamics_limit.html#a8ad7788915e12262221aa983c0588d62',1,'franky::DynamicsLimit']]],
+  ['max_5fdelta_5ftau_7',['max_delta_tau',['../structfranky_1_1_torque_stop_params.html#a6b8b726bffa20c3c4bd294c250053af2',1,'franky::TorqueStopParams::max_delta_tau'],['../structfranky_1_1_torque_safety_params.html#a7b7d3c7d9f1e26a6e23a5403dcbaf8bf',1,'franky::TorqueSafetyParams::max_delta_tau']]],
+  ['max_5fduration_8',['max_duration',['../structfranky_1_1_torque_stop_params.html#a834c65631445ae7d8cff2c0202824d58',1,'franky::TorqueStopParams']]],
+  ['max_5ftorque_9',['max_torque',['../structfranky_1_1_posture_task.html#ae87e834b004a660bc10bfb7d2a0c781c',1,'franky::PostureTask::max_torque'],['../structfranky_1_1_manipulability_task.html#ad0aa5fdc62198e068759d5b0e8f78dda',1,'franky::ManipulabilityTask::max_torque'],['../structfranky_1_1_friction_compensation_params.html#a2c8b5ce500dc1b7f0cad9892af2adf1f',1,'franky::FrictionCompensationParams::max_torque']]],
+  ['max_5ftotal_5fduration_10',['max_total_duration',['../structfranky_1_1_waypoint.html#a2a1eae68a4e9d3b9c54a0ff1fd6c9bb2',1,'franky::Waypoint']]],
+  ['minimum_5ftime_11',['minimum_time',['../structfranky_1_1_waypoint.html#ae1532c5f277153a041d626ce4666d382',1,'franky::Waypoint']]]
 ];

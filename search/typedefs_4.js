@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['scalarorarray_0',['ScalarOrArray',['../namespacefranky.html#ae77a95d5f13271457b8c8fb645da3bd9',1,'franky']]]
+  ['matrix6d_0',['Matrix6d',['../namespacefranky.html#a6ccd41d8c07a9600de3eb0394cc5e039',1,'franky']]]
 ];

@@ -1,8 +1,6 @@
 var searchData=
 [
-  ['joint_5facceleration_5flimit_0',['joint_acceleration_limit',['../classfranky_1_1_robot.html#a0348db847ba5ddaae49c0dcb48f4a710',1,'franky::Robot']]],
-  ['joint_5fcollision_1',['joint_collision',['../structfranky_1_1_robot_state.html#a72895f75e936aa0ff27597cac3875be3',1,'franky::RobotState']]],
-  ['joint_5fcontact_2',['joint_contact',['../structfranky_1_1_robot_state.html#a2e51845f6d79feb2df6069812549c708',1,'franky::RobotState']]],
-  ['joint_5fjerk_5flimit_3',['joint_jerk_limit',['../classfranky_1_1_robot.html#aa3bd3f0843a7c2c4aeae3d5c21d506b9',1,'franky::Robot']]],
-  ['joint_5fvelocity_5flimit_4',['joint_velocity_limit',['../classfranky_1_1_robot.html#a4d5a68c15c97aba59872e6795ed1500f',1,'franky::Robot']]]
+  ['i_5fee_0',['I_ee',['../structfranky_1_1_robot_state.html#a9646c969429e0853722837c950820f44',1,'franky::RobotState']]],
+  ['i_5fload_1',['I_load',['../structfranky_1_1_robot_state.html#ad8590b96b51241bea2620dcc482c0f9a',1,'franky::RobotState']]],
+  ['i_5ftotal_2',['I_total',['../structfranky_1_1_robot_state.html#a627a19dfeb245fe9929b5dba0de4516b',1,'franky::RobotState']]]
 ];
