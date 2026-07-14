@@ -3,7 +3,7 @@ name: Publish fork wheels
 on:
   push:
     branches:
-      - "wheel-builds-*"
+      - fork-dev
   workflow_dispatch:
     inputs:
       libfranka-version:
