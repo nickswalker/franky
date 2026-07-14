@@ -11,3 +11,4 @@ tmp
 /cmake-build-*
 /.idea/
 /doc/api/generated/
+/doc/_build/
