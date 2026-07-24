@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="🎬 Executing Motions" href="executing-motions.html"><link rel="prev" title="🏃‍♂️ Motion Types" href="motion-types.html">
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="💪 Torque Control" href="torque-control.html"><link rel="prev" title="🏃‍♂️ Trajectory Control" href="trajectory-control.html">
         <link rel="prefetch" href="../_static/logo.svg" as="image">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
@@ -210,13 +210,14 @@
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">📚 Guide</a><input aria-label="Toggle navigation of 📚 Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="geometry.html">🧮 Geometry</a></li>
 <li class="toctree-l2"><a class="reference internal" href="robot.html">🤖 Robot</a></li>
-<li class="toctree-l2"><a class="reference internal" href="motion-types.html">🏃‍♂️ Motion Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory-control.html">🏃‍♂️ Trajectory Control</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">🫨 Impedance Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torque-control.html">💪 Torque Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="executing-motions.html">🎬 Executing Motions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="reactions.html">⚡ Real-Time Reactions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="realtime-motions.html">⏱️ Real-Time Motions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gripper.html">👌 Gripper</a></li>
-<li class="toctree-l2"><a class="reference internal" href="desk.html">🖳 Accessing the Web Interface API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="desk.html">🖳 Accessing the Desk API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="simulation.html">🖥️ Simulating the Robot</a></li>
 </ul>
 </li>
@@ -287,6 +288,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceMotion.html">franky.CartesianImpedanceMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceTrackingMotion.html">franky.CartesianImpedanceTrackingMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceTracker.html">franky.CartesianImpedanceTracker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CRITICAL.html">franky.CRITICAL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceGains.html">franky.CartesianImpedanceGains</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceParams.html">franky.CartesianImpedanceParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceMotionParams.html">franky.CartesianImpedanceMotionParams</a></li>
@@ -297,6 +299,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueSafetyParams.html">franky.TorqueSafetyParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueStopMotion.html">franky.TorqueStopMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueStopParams.html">franky.TorqueStopParams</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.SimpleTorqueMotion.html">franky.SimpleTorqueMotion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.SimpleTorqueParams.html">franky.SimpleTorqueParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.Reaction.html">franky.Reaction</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.Condition.html">franky.Condition</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.Measure.html">franky.Measure</a></li>
@@ -328,6 +332,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.ProtocolException.html">franky.ProtocolException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.ReactionRecursionException.html">franky.ReactionRecursionException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.RealtimeException.html">franky.RealtimeException</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueSignalTimeoutException.html">franky.TorqueSignalTimeoutException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.DeskError.html">franky.DeskError</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.FrankaAPIError.html">franky.FrankaAPIError</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TakeControlTimeoutError.html">franky.TakeControlTimeoutError</a></li>
@@ -382,8 +387,10 @@
         <article role="main" id="furo-main-content">
           <section class="tex2jax_ignore mathjax_ignore" id="impedance-control">
 <h1>🫨 Impedance Control<a class="headerlink" href="#impedance-control" title="Link to this heading">¶</a></h1>
-<p>In addition to the <a class="reference internal" href="motion-types.html"><span class="std std-doc">trajectory-based motion types</span></a>, franky also provides
+<p>In addition to the <a class="reference internal" href="trajectory-control.html"><span class="std std-doc">trajectory control modes</span></a>, franky also provides
 client-side impedance controllers in torque mode.</p>
+<p>If you want to command joint torques directly instead of using a spring-damper
+law, see <a class="reference internal" href="torque-control.html"><span class="std std-doc">Torque Control</span></a>.</p>
 <p>There are two variants for both joint-space and Cartesian impedance:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">JointImpedanceMotion</span></code> and <code class="docutils literal notranslate"><span class="pre">CartesianImpedanceMotion</span></code> are fixed-target motions.
@@ -439,22 +446,27 @@ added on top of any <code class="docutils literal notranslate"><span class="pre"
 <p>All joint-space impedance motions (<code class="docutils literal notranslate"><span class="pre">JointImpedanceMotion</span></code>, <code class="docutils literal notranslate"><span class="pre">JointImpedanceTrackingMotion</span></code>,
 and <code class="docutils literal notranslate"><span class="pre">JointImpedanceTracker</span></code>) support optional friction compensation. Coulomb and viscous
 terms are added as feedforward terms to the commanded torque each cycle and clamped per joint:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use friction compensation to get a smooth zero-g mode kinesthetic demonstrations</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">franky</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrictionCompensationParams</span>
+
+<span class="c1"># Use friction compensation to get a smooth zero-g mode kinesthetic demonstrations</span>
 <span class="k">with</span> <span class="n">JointImpedanceTracker</span><span class="p">(</span>
     <span class="n">robot</span><span class="p">,</span>
     <span class="n">stiffness</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>
     <span class="n">damping</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>
-    <span class="n">friction_coulomb</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">],</span>   <span class="c1"># [Nm]</span>
-    <span class="n">friction_viscous</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">],</span> <span class="c1"># [Nms/rad]</span>
-    <span class="n">friction_max_torque</span><span class="o">=</span><span class="p">[</span><span class="mf">2.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>  <span class="c1"># per-joint clamp [Nm]</span>
+    <span class="n">friction</span><span class="o">=</span><span class="n">FrictionCompensationParams</span><span class="p">(</span>
+        <span class="n">coulomb</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">],</span>   <span class="c1"># [Nm]</span>
+        <span class="n">viscous</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">],</span> <span class="c1"># [Nms/rad]</span>
+        <span class="n">max_torque</span><span class="o">=</span><span class="p">[</span><span class="mf">2.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>  <span class="c1"># per-joint clamp [Nm]</span>
+    <span class="p">),</span>
     <span class="n">period</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
 <span class="p">)</span> <span class="k">as</span> <span class="n">tracker</span><span class="p">:</span>
     <span class="o">...</span>
 </pre></div>
 </div>
 <p>The Coulomb term uses a smooth sign approximation controlled by
-<code class="docutils literal notranslate"><span class="pre">friction_velocity_epsilon</span></code> (default <code class="docutils literal notranslate"><span class="pre">0.03</span> <span class="pre">rad/s</span></code>). Either or both terms can
-be omitted; unset terms default to zero.</p>
+<code class="docutils literal notranslate"><span class="pre">FrictionCompensationParams.velocity_epsilon</span></code> (default <code class="docutils literal notranslate"><span class="pre">0.03</span> <span class="pre">rad/s</span></code>). Either or both
+terms can be omitted; unset terms default to zero. <code class="docutils literal notranslate"><span class="pre">CartesianImpedanceTracker</span></code> accepts
+the same <code class="docutils literal notranslate"><span class="pre">friction=</span></code> object.</p>
 <p>Joint impedance can additionally be shaped in Cartesian space. Passing
 <code class="docutils literal notranslate"><span class="pre">cartesian_stiffness</span></code> (a 6-vector <code class="docutils literal notranslate"><span class="pre">[x,</span> <span class="pre">y,</span> <span class="pre">z,</span> <span class="pre">rx,</span> <span class="pre">ry,</span> <span class="pre">rz]</span></code> at the end effector,
 expressed in the base frame) adds <code class="docutils literal notranslate"><span class="pre">J^T</span> <span class="pre">diag(cartesian_stiffness)</span> <span class="pre">J</span></code> on top of
@@ -493,6 +505,7 @@ discontinuity errors from abrupt torque steps.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">franky</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">Affine</span><span class="p">,</span>
     <span class="n">CartesianImpedanceTracker</span><span class="p">,</span>
+    <span class="n">PostureTask</span><span class="p">,</span>
     <span class="n">Twist</span><span class="p">,</span>
 <span class="p">)</span>
 
@@ -500,8 +513,7 @@ discontinuity errors from abrupt torque steps.</p>
     <span class="n">robot</span><span class="p">,</span>
     <span class="n">translational_stiffness</span><span class="o">=</span><span class="mf">1200.0</span><span class="p">,</span>
     <span class="n">rotational_stiffness</span><span class="o">=</span><span class="mf">80.0</span><span class="p">,</span>
-    <span class="n">nullspace_target</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.7</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span>
-    <span class="n">nullspace_stiffness</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>
+    <span class="n">posture_task</span><span class="o">=</span><span class="n">PostureTask</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.7</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span> <span class="n">stiffness</span><span class="o">=</span><span class="mf">10.0</span><span class="p">),</span>
     <span class="n">max_delta_tau</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
     <span class="n">period</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
 <span class="p">)</span> <span class="k">as</span> <span class="n">tracker</span><span class="p">:</span>
@@ -541,21 +553,38 @@ configurations often need more — the damping can be set explicitly through
 <span class="p">)</span>
 </pre></div>
 </div>
-<p>Cartesian impedance motions also support an optional secondary posture
-objective through <code class="docutils literal notranslate"><span class="pre">nullspace_target</span></code> and <code class="docutils literal notranslate"><span class="pre">nullspace_stiffness</span></code>. When enabled,
-the controller adds a joint-space posture term projected into the Jacobian
-nullspace, so it biases the redundant arm posture without changing the
-Cartesian task to first order. <code class="docutils literal notranslate"><span class="pre">nullspace_stiffness</span></code> accepts either a single
-scalar applied to all joints or a per-joint 7-vector, so individual joints can
-be weighted differently or excluded (zero stiffness) from the posture
-objective. Keep in mind that the projection spreads the resulting torque over
-all joints participating in the self-motion: pushing a single joint biases the
-whole null-space posture rather than moving that joint alone. The posture
-gains can be retuned online by passing <code class="docutils literal notranslate"><span class="pre">nullspace_stiffness</span></code> (scalar or
-7-vector) to <code class="docutils literal notranslate"><span class="pre">CartesianImpedanceTracker.set_gains</span></code>, or by writing a
-<code class="docutils literal notranslate"><span class="pre">NullspaceGains</span></code> object through <code class="docutils literal notranslate"><span class="pre">tracker.motion.set_nullspace_gains</span></code>.
-Further nullspace objectives (such as manipulability maximization) and fully
-custom <code class="docutils literal notranslate"><span class="pre">nullspace_tasks</span></code> are available through the C++ API.</p>
+<p>The tracker also exposes damping directly: <code class="docutils literal notranslate"><span class="pre">tracker.set_gains(damping=[...])</span></code> pins a full
+6-vector, and <code class="docutils literal notranslate"><span class="pre">tracker.set_gains(damping=franky.CRITICAL)</span></code> unpins it. Damping is all-or-nothing
+and omitting it means critical. A stiffness change re-criticals damping unless <code class="docutils literal notranslate"><span class="pre">damping</span></code> is
+passed in the same call. <code class="docutils literal notranslate"><span class="pre">JointImpedanceTracker.set_gains</span></code> follows the same rule with 7-vectors.</p>
+<p>Cartesian impedance motions also support optional secondary objectives projected
+into the Jacobian nullspace, so they bias the redundant arm posture without
+changing the Cartesian task to first order. Pass a <code class="docutils literal notranslate"><span class="pre">posture_task</span></code> (a
+<code class="docutils literal notranslate"><span class="pre">PostureTask</span></code>) to regulate toward a joint posture, and/or a <code class="docutils literal notranslate"><span class="pre">manipulability_task</span></code>
+(a <code class="docutils literal notranslate"><span class="pre">ManipulabilityTask</span></code>) to maximize manipulability; at most one of each is
+supported. A <code class="docutils literal notranslate"><span class="pre">PostureTask</span></code>’s per-joint stiffness can weight joints differently or
+exclude them (zero stiffness). Keep in mind that the projection spreads the
+resulting torque over all joints participating in the self-motion: pushing a
+single joint biases the whole null-space posture rather than moving that joint
+alone.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">franky</span><span class="w"> </span><span class="kn">import</span> <span class="n">ManipulabilityTask</span><span class="p">,</span> <span class="n">PostureTask</span>
+
+<span class="k">with</span> <span class="n">CartesianImpedanceTracker</span><span class="p">(</span>
+    <span class="n">robot</span><span class="p">,</span>
+    <span class="n">translational_stiffness</span><span class="o">=</span><span class="mf">200.0</span><span class="p">,</span>
+    <span class="n">rotational_stiffness</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>
+    <span class="n">posture_task</span><span class="o">=</span><span class="n">PostureTask</span><span class="p">(</span><span class="n">robot</span><span class="o">.</span><span class="n">current_joint_state</span><span class="o">.</span><span class="n">position</span><span class="p">,</span> <span class="n">stiffness</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span>
+    <span class="n">manipulability_task</span><span class="o">=</span><span class="n">ManipulabilityTask</span><span class="p">(</span><span class="n">gain</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">max_torque</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+    <span class="n">period</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+<span class="p">)</span> <span class="k">as</span> <span class="n">tracker</span><span class="p">:</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>The task set is fixed at construction, but the gains can be retuned online:
+<code class="docutils literal notranslate"><span class="pre">tracker.set_gains(posture_stiffness=...)</span></code> (scalar or 7-vector) nudges just the
+posture stiffness, or <code class="docutils literal notranslate"><span class="pre">tracker.set_gains(nullspace_gains=NullspaceGains(...))</span></code>
+replaces the full posture + manipulability gains. Retuning a gain for a task that
+was not configured at construction raises.</p>
 <p><code class="docutils literal notranslate"><span class="pre">CartesianImpedanceTracker</span></code> also accepts <code class="docutils literal notranslate"><span class="pre">translational_error_clip</span></code> and
 <code class="docutils literal notranslate"><span class="pre">rotational_error_clip</span></code> (each a 3-vector in m and rad respectively) to hard-clip
 the pose error fed into the spring law, which can prevent large torque spikes
@@ -593,23 +622,23 @@ a sustained external push can never make the stop hang.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="executing-motions.html">
+          <a class="next-page" href="torque-control.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">🎬 Executing Motions</div>
+                <div class="title">💪 Torque Control</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="motion-types.html">
+          <a class="prev-page" href="trajectory-control.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">🏃‍♂️ Motion Types</div>
+                <div class="title">🏃‍♂️ Trajectory Control</div>
                 
               </div>
             </a>

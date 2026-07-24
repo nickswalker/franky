@@ -64,7 +64,7 @@ See the [Geometry](../guide/geometry.md) chapter of the guide for an introductio
 ## Trajectory Motions
 
 Motion types for the four trajectory control modes.
-See the [Motion Types](../guide/motion-types.md) chapter of the guide for an introduction.
+See the [Trajectory Control](../guide/trajectory-control.md) chapter of the guide for an introduction.
 
 ### Joint Position Control
 
@@ -155,6 +155,7 @@ See the [Impedance Control](../guide/impedance-control.md) chapter of the guide 
    CartesianImpedanceMotion
    CartesianImpedanceTrackingMotion
    CartesianImpedanceTracker
+   CRITICAL
    CartesianImpedanceGains
    CartesianImpedanceParams
    CartesianImpedanceMotionParams
@@ -165,6 +166,8 @@ See the [Impedance Control](../guide/impedance-control.md) chapter of the guide 
    TorqueSafetyParams
    TorqueStopMotion
    TorqueStopParams
+   SimpleTorqueMotion
+   SimpleTorqueParams
 ```
 
 ## Reactions
@@ -206,10 +209,10 @@ See the [Gripper](../guide/gripper.md) chapter of the guide for an introduction.
    BoolFuture
 ```
 
-## Desk Web Interface
+## Desk API
 
 Programmatic access to the Franka Desk web interface.
-See the [Web Interface API](../guide/desk.md) chapter of the guide for an introduction.
+See the [Desk API](../guide/desk.md) chapter of the guide for an introduction.
 
 ```{eval-rst}
 .. currentmodule:: franky
@@ -249,6 +252,7 @@ See the [Web Interface API](../guide/desk.md) chapter of the guide for an introd
    ProtocolException
    ReactionRecursionException
    RealtimeException
+   TorqueSignalTimeoutException
    DeskError
    FrankaAPIError
    TakeControlTimeoutError

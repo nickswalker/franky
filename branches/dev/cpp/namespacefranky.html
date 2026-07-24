@@ -224,6 +224,12 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfranky_1_1_robot_velocity.html">RobotVelocity</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cartesian velocity of a robot.  <a href="classfranky_1_1_robot_velocity.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfranky_1_1_simple_torque_motion.html">SimpleTorqueMotion</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Direct joint torque control with a signal watchdog.  <a href="classfranky_1_1_simple_torque_motion.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfranky_1_1_simple_torque_params.html">SimpleTorqueParams</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parameters for <a class="el" href="classfranky_1_1_simple_torque_motion.html" title="Direct joint torque control with a signal watchdog.">SimpleTorqueMotion</a>.  <a href="structfranky_1_1_simple_torque_params.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfranky_1_1_stop_motion.html">StopMotion</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfranky_1_1_stop_motion_3_01franka_1_1_cartesian_pose_01_4.html">StopMotion&lt; franka::CartesianPose &gt;</a></td></tr>
@@ -244,6 +250,9 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfranky_1_1_torque_safety_params.html">TorqueSafetyParams</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Shared torque safety limits and soft joint-limit repulsion settings for torque-control motions.  <a href="structfranky_1_1_torque_safety_params.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfranky_1_1_torque_signal_timeout_exception.html">TorqueSignalTimeoutException</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Thrown when a <a class="el" href="classfranky_1_1_simple_torque_motion.html" title="Direct joint torque control with a signal watchdog.">SimpleTorqueMotion</a> does not receive a new torque signal in time.  <a href="structfranky_1_1_torque_signal_timeout_exception.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfranky_1_1_torque_stop_params.html">TorqueStopParams</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parameters for the torque-control stop motion (<a class="el" href="classfranky_1_1_stop_motion_3_01franka_1_1_torques_01_4.html" title="Graceful stop for torque-control (impedance) motions.">StopMotion&lt;franka::Torques&gt;</a>).  <a href="structfranky_1_1_torque_stop_params.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -257,7 +266,7 @@ Classes</h2></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A motion following multiple velocity waypoints in a time-optimal way. Works with arbitrary initial conditions.  <a href="classfranky_1_1_velocity_waypoint_motion.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfranky_1_1_wait_free_triple_buffer.html">WaitFreeTripleBuffer</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wait-free, Single-Producer Single-Consumer (SPSC) triple buffer.  <a href="classfranky_1_1_wait_free_triple_buffer.html#details">More...</a><br /></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Triple buffer connecting concurrent user threads with a single real-time thread.  <a href="classfranky_1_1_wait_free_triple_buffer.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfranky_1_1_waypoint.html">Waypoint</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A waypoint with a target and optional parameters.  <a href="structfranky_1_1_waypoint.html#details">More...</a><br /></td></tr>

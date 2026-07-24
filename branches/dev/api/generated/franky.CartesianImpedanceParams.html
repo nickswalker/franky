@@ -210,13 +210,14 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/index.html">📚 Guide</a><input aria-label="Toggle navigation of 📚 Guide" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/geometry.html">🧮 Geometry</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/robot.html">🤖 Robot</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../guide/motion-types.html">🏃‍♂️ Motion Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/trajectory-control.html">🏃‍♂️ Trajectory Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/impedance-control.html">🫨 Impedance Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/torque-control.html">💪 Torque Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/executing-motions.html">🎬 Executing Motions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/reactions.html">⚡ Real-Time Reactions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/realtime-motions.html">⏱️ Real-Time Motions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/gripper.html">👌 Gripper</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../guide/desk.html">🖳 Accessing the Web Interface API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/desk.html">🖳 Accessing the Desk API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/simulation.html">🖥️ Simulating the Robot</a></li>
 </ul>
 </li>
@@ -287,6 +288,7 @@
 <li class="toctree-l2"><a class="reference internal" href="franky.CartesianImpedanceMotion.html">franky.CartesianImpedanceMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.CartesianImpedanceTrackingMotion.html">franky.CartesianImpedanceTrackingMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.CartesianImpedanceTracker.html">franky.CartesianImpedanceTracker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="franky.CRITICAL.html">franky.CRITICAL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.CartesianImpedanceGains.html">franky.CartesianImpedanceGains</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">franky.CartesianImpedanceParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.CartesianImpedanceMotionParams.html">franky.CartesianImpedanceMotionParams</a></li>
@@ -297,6 +299,8 @@
 <li class="toctree-l2"><a class="reference internal" href="franky.TorqueSafetyParams.html">franky.TorqueSafetyParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.TorqueStopMotion.html">franky.TorqueStopMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.TorqueStopParams.html">franky.TorqueStopParams</a></li>
+<li class="toctree-l2"><a class="reference internal" href="franky.SimpleTorqueMotion.html">franky.SimpleTorqueMotion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="franky.SimpleTorqueParams.html">franky.SimpleTorqueParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.Reaction.html">franky.Reaction</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.Condition.html">franky.Condition</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.Measure.html">franky.Measure</a></li>
@@ -328,6 +332,7 @@
 <li class="toctree-l2"><a class="reference internal" href="franky.ProtocolException.html">franky.ProtocolException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.ReactionRecursionException.html">franky.ReactionRecursionException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.RealtimeException.html">franky.RealtimeException</a></li>
+<li class="toctree-l2"><a class="reference internal" href="franky.TorqueSignalTimeoutException.html">franky.TorqueSignalTimeoutException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.DeskError.html">franky.DeskError</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.FrankaAPIError.html">franky.FrankaAPIError</a></li>
 <li class="toctree-l2"><a class="reference internal" href="franky.TakeControlTimeoutError.html">franky.TakeControlTimeoutError</a></li>
@@ -414,7 +419,9 @@
 <dt class="sig sig-object py" id="franky.CartesianImpedanceParams.nullspace_tasks">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">nullspace_tasks</span></span><a class="headerlink" href="#franky.CartesianImpedanceParams.nullspace_tasks" title="Link to this definition">¶</a></dt>
 <dd><p>Nullspace objectives.</p>
-<p>Each task contributes a joint-space torque that is summed and projected into the Jacobian nullspace.</p>
+<p>Each task contributes a joint-space torque that is summed and projected into the Jacobian nullspace.
+At most one task of each concrete type is supported because runtime-adjustable gains are shared by
+task type.</p>
 </dd></dl>
 
 <dl class="py property">

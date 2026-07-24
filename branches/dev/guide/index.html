@@ -210,13 +210,14 @@
 <li class="toctree-l1 current has-children current-page"><a class="current reference internal" href="#">📚 Guide</a><input aria-label="Toggle navigation of 📚 Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="geometry.html">🧮 Geometry</a></li>
 <li class="toctree-l2"><a class="reference internal" href="robot.html">🤖 Robot</a></li>
-<li class="toctree-l2"><a class="reference internal" href="motion-types.html">🏃‍♂️ Motion Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory-control.html">🏃‍♂️ Trajectory Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="impedance-control.html">🫨 Impedance Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torque-control.html">💪 Torque Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="executing-motions.html">🎬 Executing Motions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="reactions.html">⚡ Real-Time Reactions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="realtime-motions.html">⏱️ Real-Time Motions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gripper.html">👌 Gripper</a></li>
-<li class="toctree-l2"><a class="reference internal" href="desk.html">🖳 Accessing the Web Interface API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="desk.html">🖳 Accessing the Desk API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="simulation.html">🖥️ Simulating the Robot</a></li>
 </ul>
 </li>
@@ -287,6 +288,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceMotion.html">franky.CartesianImpedanceMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceTrackingMotion.html">franky.CartesianImpedanceTrackingMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceTracker.html">franky.CartesianImpedanceTracker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CRITICAL.html">franky.CRITICAL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceGains.html">franky.CartesianImpedanceGains</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceParams.html">franky.CartesianImpedanceParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.CartesianImpedanceMotionParams.html">franky.CartesianImpedanceMotionParams</a></li>
@@ -297,6 +299,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueSafetyParams.html">franky.TorqueSafetyParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueStopMotion.html">franky.TorqueStopMotion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueStopParams.html">franky.TorqueStopParams</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.SimpleTorqueMotion.html">franky.SimpleTorqueMotion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.SimpleTorqueParams.html">franky.SimpleTorqueParams</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.Reaction.html">franky.Reaction</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.Condition.html">franky.Condition</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.Measure.html">franky.Measure</a></li>
@@ -328,6 +332,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.ProtocolException.html">franky.ProtocolException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.ReactionRecursionException.html">franky.ReactionRecursionException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.RealtimeException.html">franky.RealtimeException</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TorqueSignalTimeoutException.html">franky.TorqueSignalTimeoutException</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.DeskError.html">franky.DeskError</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.FrankaAPIError.html">franky.FrankaAPIError</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/generated/franky.TakeControlTimeoutError.html">franky.TakeControlTimeoutError</a></li>
@@ -424,17 +429,24 @@ types, how to implement real-time reactions and changing waypoints in real time,
 <li class="toctree-l2"><a class="reference internal" href="robot.html#robot-state">Robot State</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="motion-types.html">🏃‍♂️ Motion Types</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="motion-types.html#joint-position-control">Joint Position Control</a></li>
-<li class="toctree-l2"><a class="reference internal" href="motion-types.html#joint-velocity-control">Joint Velocity Control</a></li>
-<li class="toctree-l2"><a class="reference internal" href="motion-types.html#cartesian-position-control">Cartesian Position Control</a></li>
-<li class="toctree-l2"><a class="reference internal" href="motion-types.html#cartesian-velocity-control">Cartesian Velocity Control</a></li>
+<li class="toctree-l1"><a class="reference internal" href="trajectory-control.html">🏃‍♂️ Trajectory Control</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="trajectory-control.html#joint-position-control">Joint Position Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory-control.html#joint-velocity-control">Joint Velocity Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory-control.html#cartesian-position-control">Cartesian Position Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory-control.html#cartesian-velocity-control">Cartesian Velocity Control</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="impedance-control.html">🫨 Impedance Control</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="impedance-control.html#joint-impedance-control">Joint Impedance Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="impedance-control.html#cartesian-impedance-control">Cartesian Impedance Control</a></li>
 <li class="toctree-l2"><a class="reference internal" href="impedance-control.html#ending-a-torque-motion">Ending a Torque Motion</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="torque-control.html">💪 Torque Control</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="torque-control.html#the-signal-watchdog">The Signal Watchdog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torque-control.html#initial-torque">Initial Torque</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torque-control.html#safety-limits">Safety Limits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torque-control.html#ending-the-motion">Ending the Motion</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="executing-motions.html">🎬 Executing Motions</a><ul>
@@ -446,7 +458,7 @@ types, how to implement real-time reactions and changing waypoints in real time,
 <li class="toctree-l1"><a class="reference internal" href="reactions.html">⚡ Real-Time Reactions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="realtime-motions.html">⏱️ Real-Time Motions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gripper.html">👌 Gripper</a></li>
-<li class="toctree-l1"><a class="reference internal" href="desk.html">🖳 Accessing the Web Interface API</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="desk.html">🖳 Accessing the Desk API</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="desk.html#reading-pilot-button-events">Reading Pilot Button Events</a></li>
 </ul>
 </li>
