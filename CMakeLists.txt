@@ -46,8 +46,12 @@ if (FRANKY_PREBUILT_LIB)
     )
 else ()
     file(GLOB_RECURSE SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-    add_library(franky SHARED ${SRC})
+    # Vendored GeoFIK analytical IK solver (third_party/geofik, MIT). Compiled into
+    # libfranky and consumed only through franky/kinematics.hpp; its header is a
+    # PRIVATE include so it is not exposed as part of franky's public API.
+    add_library(franky SHARED ${SRC} ${CMAKE_CURRENT_SOURCE_DIR}/third_party/geofik/geofik.cpp)
     target_include_directories(franky PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(franky PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/geofik)
     target_link_libraries(franky PUBLIC Franka::Franka Eigen3::Eigen ruckig::ruckig)
 endif ()
 

@@ -47,6 +47,7 @@ types, how to implement real-time reactions and changing waypoints in real time,
 geometry
 robot
 motion-types
+inverse-kinematics
 impedance-control
 executing-motions
 reactions
