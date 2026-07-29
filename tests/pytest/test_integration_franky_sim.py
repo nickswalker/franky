@@ -314,121 +314,238 @@ def test_cartesian_impedance_motion():
 # Test 6b - Cartesian impedance null-space posture task
 # ---------------------------------------------------------------------------
 
+NULLSPACE_ROT_ATOL = 0.1  # rad – how far the held end-effector orientation may drift
+NULLSPACE_OFFSET = 0.4 * np.sqrt(2)  # rad – ~0.4 on each of joints 1 and 3
 
-@pytest.mark.timeout(30)
+
+def nullspace_direction(robot: franky.Robot) -> np.ndarray:
+    """
+    Unit vector spanning the null space of the end-effector Jacobian at the
+    robot's current configuration, signed so that joint 1 rotates forward.
+
+    The FR3 has 7 DoF and the Cartesian task constrains 6, so away from
+    singularities this is the *only* joint-velocity direction that leaves the
+    end-effector pose unchanged.  The controller's projector
+    N = I - J^T (J^T)^+ maps every posture torque onto exactly this direction,
+    which is what the phases below check from both sides.
+
+    Deriving it from the live Jacobian rather than hard-coding it keeps the
+    assertions valid at whatever configuration a phase happens to start from.
+    """
+    jacobian = np.asarray(
+        robot.model.zero_jacobian(franky.Frame.EndEffector, robot.state)
+    )
+    _, singular_values, vh = np.linalg.svd(jacobian)
+    assert singular_values[5] > 1e-2, (
+        f"Configuration is near-singular (singular values {singular_values}); the "
+        f"null space is not the well-conditioned 1-D space this test assumes"
+    )
+    direction = vh[6]
+    return direction if direction[0] > 0 else -direction
+
+
+def split_along(vector: np.ndarray, direction: np.ndarray) -> tuple[float, float]:
+    """Split `vector` into its signed component along unit `direction` and the norm of the rest."""
+    along = float(vector @ direction)
+    return along, float(np.linalg.norm(vector - along * direction))
+
+
+def max_pose_deviation(states, reference: franky.Affine) -> tuple[float, float]:
+    """Largest translational (m) and rotational (rad) deviation from `reference` over `states`."""
+    reference_matrix = np.asarray(reference.matrix)
+    max_translation = 0.0
+    max_rotation = 0.0
+    for state in states:
+        actual = np.asarray(state.O_T_EE.matrix)
+        max_translation = max(
+            max_translation,
+            float(np.linalg.norm(actual[:3, 3] - reference_matrix[:3, 3])),
+        )
+        relative = actual[:3, :3] @ reference_matrix[:3, :3].T
+        max_rotation = max(
+            max_rotation,
+            float(np.arccos(np.clip((np.trace(relative) - 1.0) / 2.0, -1.0, 1.0))),
+        )
+    return max_translation, max_rotation
+
+
+def run_nullspace_posture(
+    robot: franky.Robot,
+    hold_pose: franky.Affine,
+    nullspace_target: np.ndarray,
+    nullspace_stiffness,
+    duration_s: float = 3.0,
+) -> np.ndarray:
+    """
+    Hold `hold_pose` with a Cartesian impedance motion while a posture task pulls
+    the joints toward `nullspace_target`, and assert the end-effector stayed put
+    throughout.  Returns the joint displacement over the motion.
+    """
+    import time
+
+    motion = franky.CartesianImpedanceMotion(
+        franky.Affine(hold_pose.matrix),
+        nullspace_target=nullspace_target,
+        nullspace_stiffness=nullspace_stiffness,
+    )
+    # Scalars are broadcast to per-joint gains; readback is a 7-vector.
+    np.testing.assert_allclose(
+        motion.get_nullspace_gains().posture_stiffness,
+        np.broadcast_to(nullspace_stiffness, 7),
+    )
+
+    states = []
+    motion.register_callback(lambda robot_state, *_: states.append(robot_state))
+
+    q_initial = np.array(robot.current_joint_state.position)
+    robot.move(motion, asynchronous=True)
+    time.sleep(duration_s)
+    robot.stop()
+    try:
+        robot.join_motion()
+    except franky.ControlException as e:
+        if "Move command preempted" not in str(e):
+            raise
+    q_final = np.array(robot.current_joint_state.position)
+
+    # Callbacks run on a separate thread and may lag the control loop; let them drain.
+    prev_count = -1
+    while len(states) != prev_count:
+        prev_count = len(states)
+        time.sleep(0.2)
+    assert len(states) > 100, (
+        f"Only {len(states)} control steps recorded for a {duration_s}s motion; "
+        f"the end-effector was effectively not monitored"
+    )
+
+    # Primary task: the end-effector must hold the commanded pose for the whole
+    # motion, not merely be back near it once the arm has settled.  Taking the
+    # maximum over every control step is what makes this sensitive to posture
+    # torque leaking into the task directions.
+    max_translation, max_rotation = max_pose_deviation(states, hold_pose)
+    assert max_translation < CART_ATOL, (
+        f"Null-space posture task dragged the end-effector: peak translational "
+        f"deviation {max_translation:.4f} m over {len(states)} control steps"
+    )
+    assert max_rotation < NULLSPACE_ROT_ATOL, (
+        f"Null-space posture task rotated the end-effector: peak rotational "
+        f"deviation {max_rotation:.4f} rad over {len(states)} control steps"
+    )
+
+    return q_final - q_initial
+
+
+@pytest.mark.timeout(60)
 def test_cartesian_impedance_nullspace_posture():
     """
     Exercise the null-space posture task of the Cartesian impedance controller.
 
     The end-effector is commanded to hold its current pose while a secondary
     posture objective (nullspace_target) pulls the joints toward a different
-    configuration.  The FR3 has 7 DoF and the Cartesian task constrains 6, so
-    the controller can only move the arm along its one-dimensional self-motion
-    manifold: the joints must get measurably closer to the null-space target
-    while the end-effector pose remains unchanged.
+    configuration.  The controller projects the posture torque with
+    N = I - J^T (J^T)^+, so it may only move the arm along its one-dimensional
+    self-motion manifold.
 
-    At the initial configuration [0, 0, 0, -1.57, 0, 1.57, 0.785] joint 2 is
-    zero, so the axes of joints 1 and 3 are collinear and the self-motion is
-    exactly their counter-rotation: the null-space direction is
-    (-1, 0, 1, 0, 0, 0, 0)/sqrt(2).  The posture offsets below have a component
-    in that direction, so they are reachable without moving the end-effector.
-    (An offset with equal components on joints 1 and 3 would be orthogonal to
-    the null space and produce zero projected torque.)
+    The phases constrain that projector from both sides, which is what makes
+    them sensitive to it rather than merely to "some posture torque happened":
 
-    Phase 1 uses a per-joint stiffness vector to push just joint 1 toward a
-    target: with stiffness on only one joint, the projected torque vanishes
-    exactly when that joint reaches its target, so it must converge there
-    (joint 3 counter-rotates as the null-space byproduct).  Phase 2 uses a
-    single scalar stiffness with a target offset lying entirely in the null
-    space, which must be reached in all joints.
+    * Phase 1 puts stiffness on joint 1 only.  The projected torque vanishes
+      exactly when that joint reaches its target, so it must converge there,
+      and the displacement must be self-motion (joint 3 counter-rotating), not
+      a joint-1 rotation that the Cartesian task then has to fight.
+    * Phase 2 offsets the posture target *along* the null-space direction with a
+      scalar stiffness: the arm must travel most of that distance, and again
+      along the null space.  A projector that zeroed the posture torque would
+      leave the arm sitting still here.
+    * Phase 3 offsets it by the same amount *orthogonally* to the null space.
+      That torque lies in the row space of the Jacobian, so a correct projector
+      cancels it exactly and the arm must not move.  An absent or identity
+      projector would instead pass it straight through as a pure task-space
+      wrench and shove the end-effector.
+
+    Phases 2 and 3 differ only in the direction of an equal-magnitude offset at
+    the same stiffness, so the opposite outcomes they require can only come from
+    the projection itself.
     """
     with sim_server_context() as robot_server:
         robot = make_robot(robot_server.hostname)
 
         initial_pose = robot.current_cartesian_state.pose.end_effector_pose
-        initial_translation = np.array(initial_pose.translation).flatten()
-
-        def ns_control(nullspace_target: np.ndarray, nullspace_stiffness):
-            motion = franky.CartesianImpedanceMotion(
-                franky.Affine(initial_pose.matrix),
-                nullspace_target=nullspace_target,
-                nullspace_stiffness=nullspace_stiffness,
-            )
-            # Scalars are broadcast to per-joint gains; readback is a 7-vector.
-            np.testing.assert_allclose(
-                motion.get_nullspace_gains().posture_stiffness,
-                np.broadcast_to(nullspace_stiffness, 7),
-            )
-
-            robot.move(motion, asynchronous=True)
-
-            import time
-
-            time.sleep(3.0)
-
-            robot.stop()
-            try:
-                robot.join_motion()
-            except franky.ControlException as e:
-                if "Move command preempted" not in str(e):
-                    raise
-
-            actual_translation = np.array(
-                robot.current_cartesian_state.pose.end_effector_pose.translation
-            ).flatten()
-
-            # Primary task: the end-effector must not have been disturbed.
-            np.testing.assert_allclose(
-                actual_translation,
-                initial_translation,
-                atol=CART_ATOL,
-                err_msg="Null-space posture task disturbed the end-effector position",
-            )
 
         # Phase 1: push just joint 1 toward a target via a per-joint stiffness
-        # vector (all other joints have zero stiffness).  Joint 1 must reach
-        # its target exactly; joint 3 counter-rotates as the null-space
-        # byproduct.
+        # vector (all other joints have zero stiffness).
+        direction = nullspace_direction(robot)
         q_initial = np.array(robot.current_joint_state.position)
         nullspace_target = q_initial.copy()
         nullspace_target[0] += 0.1
-        ns_control(nullspace_target, np.array([100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
-        q_final = np.array(robot.current_joint_state.position)
+        displacement = run_nullspace_posture(
+            robot,
+            initial_pose,
+            nullspace_target,
+            np.array([100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        )
 
         np.testing.assert_allclose(
-            q_final[0],
+            q_initial[0] + displacement[0],
             nullspace_target[0],
             atol=0.05,
             err_msg="Target joint 1 did not converge to its null-space target",
         )
+        # Joint 1 must have got there by self-motion: with the posture torque
+        # projected, the counter-rotation of joint 3 comes along with it.  An
+        # unprojected joint-1 torque would move joint 1 alone, which has an
+        # off-null-space component just as large as its null-space one.
+        along, residual = split_along(displacement, direction)
+        assert residual < 0.5 * abs(along), (
+            f"Posture task did not move the arm along its self-motion manifold: "
+            f"{residual:.4f} rad of the displacement is off the null space, "
+            f"against {along:.4f} rad along it"
+        )
 
-        # Phase 2: move the joints along the null-space direction toward a
-        # target configuration using a single scalar stiffness.
+        # Phase 2: offset the posture target along the null-space direction,
+        # using a single scalar stiffness.  This is reachable without moving the
+        # end-effector, so the arm must travel it.
+        direction = nullspace_direction(robot)
         q_initial = np.array(robot.current_joint_state.position)
-        nullspace_offset = np.array([0.4, 0.0, -0.4, 0.0, 0.0, 0.0, 0.0])
-        nullspace_target = q_initial + nullspace_offset
-        ns_control(nullspace_target, 20.0)
-        q_final = np.array(robot.current_joint_state.position)
+        displacement = run_nullspace_posture(
+            robot, initial_pose, q_initial + NULLSPACE_OFFSET * direction, 20.0
+        )
+        along, residual = split_along(displacement, direction)
+        moved_in_nullspace = along
 
-        # Secondary task: the joints must have moved toward the posture target
-        # along the null space.  The target is exactly reachable, so require
-        # most of the distance to be covered (PD control leaves some residual).
-        dist_initial = np.linalg.norm(q_initial - nullspace_target)
-        dist_final = np.linalg.norm(q_final - nullspace_target)
-        assert dist_final < 0.5 * dist_initial, (
-            f"Joints did not approach the null-space target: "
-            f"|q - target| went from {dist_initial:.4f} to {dist_final:.4f}"
+        # PD control leaves some residual, so require most of the distance.
+        assert along > 0.5 * NULLSPACE_OFFSET, (
+            f"Joints did not approach the null-space target: covered {along:.4f} rad "
+            f"of the commanded {NULLSPACE_OFFSET:.4f} rad along the null space"
+        )
+        assert residual < 0.3 * along, (
+            f"Joints left the self-motion manifold: {residual:.4f} rad of the "
+            f"displacement is off the null space, against {along:.4f} rad along it"
         )
 
-        # The motion must be the expected self-motion: joint 1 forward,
-        # joint 3 backward.
-        assert q_final[0] > q_initial[0] + 0.1, (
-            f"Joint 1 did not rotate toward the null-space target "
-            f"(Δq = {q_final[0] - q_initial[0]:.4f})"
+        # Phase 3: same stiffness, same offset magnitude, but orthogonal to the
+        # null space (at the nominal configuration this is roughly equal, rather
+        # than opposite, offsets on joints 1 and 3).  The projector must cancel
+        # it, so the arm must stay where it is.
+        direction = nullspace_direction(robot)
+        q_initial = np.array(robot.current_joint_state.position)
+        raw_offset = np.array([1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0])
+        orthogonal_offset = raw_offset - (raw_offset @ direction) * direction
+        orthogonal_offset *= NULLSPACE_OFFSET / np.linalg.norm(orthogonal_offset)
+        displacement = run_nullspace_posture(
+            robot, initial_pose, q_initial + orthogonal_offset, 20.0
         )
-        assert q_final[2] < q_initial[2] - 0.1, (
-            f"Joint 3 did not rotate toward the null-space target "
-            f"(Δq = {q_final[2] - q_initial[2]:.4f})"
+
+        moved = float(np.linalg.norm(displacement))
+        assert moved < 0.05, (
+            f"An orthogonal posture offset moved the arm by {moved:.4f} rad; its "
+            f"torque lies in the row space of the Jacobian and must project to zero"
+        )
+        assert moved < 0.15 * moved_in_nullspace, (
+            f"An orthogonal posture offset moved the arm by {moved:.4f} rad, "
+            f"comparable to the {moved_in_nullspace:.4f} rad an equally large "
+            f"offset along the null space produced; the posture torque is not "
+            f"being projected"
         )
 
 
