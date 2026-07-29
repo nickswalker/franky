@@ -277,6 +277,102 @@ Vector7d gradientQR(const Kinematics &kin) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Variant F: rank-revealing complete orthogonal decomposition.
+//
+// Plain HouseholderQR is not rank-revealing: at an exact singularity R simply has a zero on the
+// diagonal and the triangular solve blows up. Eigen's CompleteOrthogonalDecomposition is the
+// idiomatic pseudo-inverse for this reason -- it pivots, exposes rank(), and degrades to the
+// minimum-norm solution instead of infinities. This is what a library would ship.
+// ---------------------------------------------------------------------------------------------
+
+double manipulabilityCOD(const Jacobian &jacobian, Eigen::Matrix<double, 6, 7> &a, int &rank) {
+  Eigen::CompleteOrthogonalDecomposition<Eigen::Matrix<double, 7, 6>> cod(jacobian.transpose());
+  rank = static_cast<int>(cod.rank());
+  // Column pivoting only permutes columns, so |prod(diag(R))| is still |det| up to sign.
+  const double w = std::abs(cod.matrixT().topLeftCorner<6, 6>().diagonal().prod());
+  a = cod.pseudoInverse();
+  return w;
+}
+
+Vector7d gradientCOD(const Kinematics &kin) {
+  const Jacobian &jacobian = kin.jacobian;
+  Eigen::Matrix<double, 6, 7> a;
+  int rank = 0;
+  const double w = manipulabilityCOD(jacobian, a, rank);
+  if (w < 1e-10) return Vector7d::Zero();
+
+  const auto z = jacobian.bottomRows<3>();
+  Vector7d gradient = Vector7d::Zero();
+  for (int i = 0; i < 7; ++i) {
+    const Eigen::Vector3d zi = z.col(i);
+    const Eigen::Vector3d zi_x_ri = zi.cross(kin.pn - kin.p.col(i));
+    double trace = 0.0;
+    for (int k = 0; k < 7; ++k) {
+      const Eigen::Vector3d zk = z.col(k);
+      if (k < i) {
+        trace += a.col(k).head<3>().dot(zk.cross(zi_x_ri));
+      } else {
+        const Eigen::Vector3d r = kin.pn - kin.p.col(k);
+        const Eigen::Vector3d zi_x_zk = zi.cross(zk);
+        trace += a.col(k).head<3>().dot(zi_x_zk.cross(r) + zk.cross(zi.cross(r)));
+        trace += a.col(k).tail<3>().dot(zi_x_zk);
+      }
+    }
+    gradient[i] = w * trace;
+  }
+  return gradient;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Variant G: damped least squares (Tikhonov) with a Cholesky solve.
+//
+// The mainstream real-time idiom, and what franka_example_controllers' pseudoInverse() does by
+// default: J^#_lambda = J^T (J J^T + lambda^2 I)^-1. The regularizer makes J J^T positive definite
+// by construction, so the Cholesky is always safe and always fast -- damping buys back exactly the
+// conditioning that forming J J^T destroyed. The cost is bias: the damped inverse is not the
+// pseudo-inverse, so the gradient it produces is not the gradient of w.
+// ---------------------------------------------------------------------------------------------
+
+double manipulabilityDLS(const Jacobian &jacobian, double lambda, Eigen::Matrix<double, 6, 7> &a) {
+  const Matrix6d jjt = jacobian * jacobian.transpose();
+  const Eigen::LLT<Matrix6d> llt(jjt + lambda * lambda * Matrix6d::Identity());
+  a = llt.solve(jacobian);
+  // w itself is still taken from the undamped product; damping it would change what is being
+  // maximized, not just how it is computed.
+  const Eigen::LLT<Matrix6d> llt_undamped(jjt);
+  if (llt_undamped.info() != Eigen::Success) return 0.0;
+  return llt_undamped.matrixL().nestedExpression().diagonal().prod();
+}
+
+Vector7d gradientDLS(const Kinematics &kin, double lambda) {
+  const Jacobian &jacobian = kin.jacobian;
+  Eigen::Matrix<double, 6, 7> a;
+  const double w = manipulabilityDLS(jacobian, lambda, a);
+  if (w < 1e-10) return Vector7d::Zero();
+
+  const auto z = jacobian.bottomRows<3>();
+  Vector7d gradient = Vector7d::Zero();
+  for (int i = 0; i < 7; ++i) {
+    const Eigen::Vector3d zi = z.col(i);
+    const Eigen::Vector3d zi_x_ri = zi.cross(kin.pn - kin.p.col(i));
+    double trace = 0.0;
+    for (int k = 0; k < 7; ++k) {
+      const Eigen::Vector3d zk = z.col(k);
+      if (k < i) {
+        trace += a.col(k).head<3>().dot(zk.cross(zi_x_ri));
+      } else {
+        const Eigen::Vector3d r = kin.pn - kin.p.col(k);
+        const Eigen::Vector3d zi_x_zk = zi.cross(zk);
+        trace += a.col(k).head<3>().dot(zi_x_zk.cross(r) + zk.cross(zi.cross(r)));
+        trace += a.col(k).tail<3>().dot(zi_x_zk);
+      }
+    }
+    gradient[i] = w * trace;
+  }
+  return gradient;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Variant D: no analytic dJ at all -- central differences of w(q), with w evaluated from the
 // analytic Jacobian. This is the variant the analytical Jacobian in the tree actually enables:
 // 14 J_from_q calls and 14 Cholesky factorizations, no joint-origin lookup, no dJ formula.
@@ -504,6 +600,16 @@ int main(int argc, char **argv) {
   });
   printRow("E. QR of J^T + fused dJ (no J J^T formed)", qr, &base);
 
+  const Stats cod = timeCalls(qs, kins, reps, [](const Vector7d &, const Kinematics &k) {
+    return gradientCOD(k).sum();
+  });
+  printRow("F. COD (rank-revealing) + fused dJ", cod, &base);
+
+  const Stats dls = timeCalls(qs, kins, reps, [](const Vector7d &, const Kinematics &k) {
+    return gradientDLS(k, 1e-2).sum();
+  });
+  printRow("G. damped LS + LLT + fused dJ (lambda=1e-2)", dls, &base);
+
   // -------------------------------------------------------------------------------------------
   // 2. Kinematics sourcing: what the seven pose() calls cost, and the one-sweep alternative.
   // -------------------------------------------------------------------------------------------
@@ -588,7 +694,7 @@ int main(int argc, char **argv) {
   std::printf("  %s\n", std::string(68, '-').c_str());
 
   const int n_accuracy = std::min(n_configs, 512);
-  std::vector<double> err_current, err_fused, err_fd, err_qr;
+  std::vector<double> err_current, err_fused, err_fd, err_qr, err_cod, err_dls, err_dls_small;
   for (int c = 0; c < n_accuracy; ++c) {
     const Vector7d ref = gradientReference(qs[c]);
     const double scale = std::max(ref.norm(), 1e-12);
@@ -596,6 +702,9 @@ int main(int argc, char **argv) {
     err_fused.push_back((gradientFused(kins[c]) - ref).norm() / scale);
     err_fd.push_back((gradientFiniteDifference(qs[c], 1e-5) - ref).norm() / scale);
     err_qr.push_back((gradientQR(kins[c]) - ref).norm() / scale);
+    err_cod.push_back((gradientCOD(kins[c]) - ref).norm() / scale);
+    err_dls_small.push_back((gradientDLS(kins[c], 1e-3) - ref).norm() / scale);
+    err_dls.push_back((gradientDLS(kins[c], 1e-2) - ref).norm() / scale);
   }
   auto report = [](const char *name, std::vector<double> &e) {
     std::sort(e.begin(), e.end());
@@ -605,6 +714,9 @@ int main(int argc, char **argv) {
   report("C. LLT pinv + fused dJ", err_fused);
   report("D. central differences, h=1e-5", err_fd);
   report("E. QR pinv + fused dJ", err_qr);
+  report("F. COD pinv + fused dJ", err_cod);
+  report("G. damped LS, lambda=1e-3", err_dls_small);
+  report("G. damped LS, lambda=1e-2", err_dls);
 
   // -------------------------------------------------------------------------------------------
   // 6. Conditioning: how each variant behaves as the arm approaches a singularity.
@@ -619,9 +731,9 @@ int main(int argc, char **argv) {
   // gives w as a product of factors of size ~w^(1/6), and never squares anything.
   // -------------------------------------------------------------------------------------------
   std::printf("\n6. near-singular behaviour (descent on w toward a rank-deficient configuration)\n");
-  std::printf("  %-8s %13s %11s %11s %11s %11s\n", "w decade", "w (sigmas)", "det rel", "chol rel", "qr rel",
-              "llt ok");
-  std::printf("  %s\n", std::string(74, '-').c_str());
+  std::printf("  %-8s %13s %11s %11s %11s %8s %10s %10s\n", "w decade", "w (sigmas)", "det rel", "chol rel", "qr rel",
+              "llt ok", "cod rank", "dls g err");
+  std::printf("  %s\n", std::string(94, '-').c_str());
   int llt_failures = 0;
   {
     Vector7d q;
@@ -643,10 +755,17 @@ int main(int argc, char **argv) {
         const double w_chol = manipulabilityLLT(k.jacobian);
         Eigen::Matrix<double, 6, 7> a;
         const double w_qr = manipulabilityQR(k.jacobian, a);
+        int rank = 0;
+        Eigen::Matrix<double, 6, 7> a_cod;
+        manipulabilityCOD(k.jacobian, a_cod, rank);
+        // How far the damped gradient has drifted from the true one at this conditioning.
+        const Vector7d g_true = gradientQR(k);
+        const Vector7d g_dls = gradientDLS(k, 1e-2);
+        const double dls_err = (g_dls - g_true).norm() / std::max(g_true.norm(), 1e-300);
         const double scale = std::max(w_ref, 1e-300);
         std::printf(
-            "  %-8.0e %13.6e %11.2e %11.2e %11.2e %11s\n", w_ref, w_ref, std::abs(w_det - w_ref) / scale,
-            std::abs(w_chol - w_ref) / scale, std::abs(w_qr - w_ref) / scale, llt_ok ? "yes" : "NO");
+            "  %-8.0e %13.6e %11.2e %11.2e %11.2e %8s %10d %10.2e\n", w_ref, w_ref, std::abs(w_det - w_ref) / scale,
+            std::abs(w_chol - w_ref) / scale, std::abs(w_qr - w_ref) / scale, llt_ok ? "yes" : "NO", rank, dls_err);
         next_decade = w_ref / 10.0;
       }
       if (w_ref < 1e-12) break;

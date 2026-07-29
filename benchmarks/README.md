@@ -30,6 +30,8 @@ is timed once per configuration with one clock read per call (back-to-back `stea
 | C | B with `dJ` never materialized — the trace is accumulated straight out of the cross products |
 | D | No analytic `dJ` at all: central differences of `w(q)` using the analytical Jacobian (14 evaluations) |
 | E | Householder QR of `J^T`, so `J J^T` is never formed; `w = abs(prod(diag(R)))`, `(J^#)^T = R^-1 Q^T` |
+| F | Complete orthogonal decomposition — rank-revealing, Eigen's idiomatic pseudo-inverse |
+| G | Damped least squares, `J^T (J J^T + lambda^2 I)^-1`, with a Cholesky solve — the mainstream RT idiom, and what `franka_example_controllers`' `pseudoInverse()` does |
 
 The identity that makes B/C/E possible: for full-row-rank `J`, `J^# = J^T (J J^T)^-1`, so
 `(J^#)^T = (J J^T)^-1 J` — which is exactly the matrix the trace `tr(J^# dJ)` contracts against, and
@@ -60,8 +62,10 @@ the ratios.
   A. current (JacobiSVD pinv + dJ)               7.25     22.72
   B. LLT pinv + dJ                               0.98      1.61     7.5x
   C. LLT pinv + fused dJ (no dJ matrix)          0.87      1.37     8.7x
-  D. central differences via analytic J (14x)   12.89     32.41     0.6x
-  E. QR of J^T + fused dJ (no J J^T formed)      1.66      4.72     4.4x
+  D. central differences via analytic J (14x)   12.95     32.52     0.6x
+  E. QR of J^T + fused dJ (no J J^T formed)      1.68      3.82     4.3x
+  F. COD (rank-revealing) + fused dJ             1.93      4.73     3.8x
+  G. damped LS + LLT + fused dJ (lambda=1e-2)    1.02      1.88     7.1x
 ```
 
 ### 2. Kinematics sourcing
@@ -103,10 +107,18 @@ Relative error against a Richardson-extrapolated central-difference reference, `
   C. LLT pinv + fused dJ                    med 7.06e-11   max 3.12e-08
   D. central differences, h=1e-5            med 2.95e-10   max 2.37e-07
   E. QR pinv + fused dJ                     med 7.06e-11   max 3.12e-08
+  F. COD pinv + fused dJ                    med 7.06e-11   max 3.12e-08
+  G. damped LS, lambda=1e-3                 med 1.01e-04   max 3.80e-01
+  G. damped LS, lambda=1e-2                 med 9.99e-03   max 9.87e-01
 ```
 
-All the analytic variants are the same function to the last bit that matters. Away from
-singularities this is purely a speed question.
+All the *undamped* analytic variants are the same function to the last bit that matters. Away from
+singularities the choice among them is purely a speed question.
+
+Damped least squares is not in that club, and this is the result worth carrying away. It is the
+standard real-time answer to an ill-conditioned pseudo-inverse — and it is the wrong tool for this
+particular pseudo-inverse. At `lambda = 1e-2` the gradient is already 1% off in the median case and
+essentially uncorrelated with the truth in the worst case.
 
 ### 6. Near-singular behaviour
 
@@ -115,17 +127,21 @@ from the singular values of `J` itself (which never forms `J J^T`, so it does no
 condition number):
 
 ```
-  w (sigmas)     det rel    chol rel      qr rel     llt ok
-  8.67e-02      3.52e-15    2.72e-15    3.04e-15       yes
-  8.59e-03      3.84e-15    2.02e-15    2.02e-15       yes
-  7.70e-04      2.47e-13    5.24e-13    4.22e-16       yes
-  4.46e-05      5.99e-11    1.07e-10    5.96e-14       yes
-  4.43e-06      4.18e-09    3.26e-09    7.41e-13       yes
-  4.36e-07      2.07e-07    1.62e-07    3.48e-12       yes
-  3.03e-08      1.49e-04    1.93e-04    4.92e-11       yes
-  8.04e-10      5.11e-02    3.42e-02    1.34e-09       yes
-  2.34e-11      1.00e+00    1.00e+00    9.43e-09        NO
+  w (sigmas)     det rel    chol rel      qr rel   llt ok   cod rank   dls g err
+  8.67e-02      3.52e-15    2.72e-15    3.04e-15      yes          6     3.65e-03
+  8.59e-03      3.84e-15    2.02e-15    2.02e-15      yes          6     5.73e-02
+  7.70e-04      2.47e-13    5.24e-13    4.22e-16      yes          6     8.45e-01
+  4.46e-05      5.99e-11    1.07e-10    5.96e-14      yes          6     1.00e+00
+  4.43e-06      4.18e-09    3.26e-09    7.41e-13      yes          6     1.00e+00
+  4.36e-07      2.07e-07    1.62e-07    3.48e-12      yes          6     1.00e+00
+  3.03e-08      1.49e-04    1.93e-04    4.92e-11      yes          6     1.00e+00
+  8.04e-10      5.11e-02    3.42e-02    1.34e-09      yes          6     1.00e+00
+  2.34e-11      1.00e+00    1.00e+00    9.43e-09       NO          6     0.00e+00
 ```
+
+`dls g err` is the relative error of the damped gradient against the true one. Damping regularizes
+toward *not moving*, so the manipulability term fades out exactly as the arm approaches the
+singularity it exists to escape — by `w ~ 1e-5` the damped gradient carries no usable information.
 
 This is the result that is easy to get wrong. Switching `det(J J^T)` for a Cholesky of `J J^T` buys
 **nothing** numerically — the damage is done by forming `J J^T` at all, which squares the condition
@@ -153,7 +169,11 @@ the way down.
 - On absolute terms, 13.7 us against a 1 ms tick is 1.4% of the budget, so nothing is on fire. The
   argument for changing it is the p99 (34 us) and the fact that the same factorization is being paid
   for twice, not a missed deadline.
-- If the change is made, prefer the QR (variant E). It is ~2 us slower than the Cholesky in the full
-  block and still 4.6x faster than what is shipped, it never fails, and it is the only variant that
-  stays accurate in exactly the region a manipulability-maximizing controller is designed to operate
-  in. Trading seven orders of magnitude of near-singular accuracy for 2 us is a bad trade here.
+- If the change is made, prefer an orthogonal factorization of `J^T` — QR (E) or, better, COD (F).
+  COD costs 0.25 us more than plain QR, is rank-revealing (plain `HouseholderQR` is not: at an exact
+  singularity `R` has a zero on the diagonal and the triangular solve produces infinities, so the
+  `w < 1e-10` guard has to precede the solve), and it is Eigen's idiomatic pseudo-inverse. Both stay
+  accurate in exactly the region a manipulability-maximizing controller is designed to operate in.
+- Do **not** damp the gradient, however standard damping is elsewhere in the loop. Damping the
+  *task* inverse and the projector is defensible and mainstream; damping the thing whose only job is
+  to report which way is away from a singularity defeats the term.
