@@ -51,6 +51,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Get wheels
         uses: actions/download-artifact@v8
@@ -58,6 +60,28 @@ jobs:
           pattern: wheels___*
           path: wheels/
           merge-multiple: true
+
+      - name: Determine commits since last release
+        id: range
+        run: |
+          set -euo pipefail
+          # Find the most recent "actual" version release tag (i.e. one created by the
+          # publish.yml workflow), as opposed to the rolling dev-release/unstable-release
+          # tags that this workflow itself keeps overwriting. Restrict to tags that are
+          # ancestors of this commit so the range is always well-formed.
+          last_release_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --merged "$GITHUB_SHA" | sort -V | tail -n1)"
+          if [ -n "$last_release_tag" ]; then
+            commit_count="$(git rev-list "${last_release_tag}..${GITHUB_SHA}" --count)"
+            compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/${last_release_tag}...${GITHUB_SHA}"
+            range_note="**Commits since last release \`${last_release_tag}\`:** \`${last_release_tag}\`…\`${GITHUB_SHA::8}\` (${commit_count} commit(s)) — [compare](${compare_url})"
+          else
+            range_note="_No previous tagged release found; this build includes the full commit history up to \`${GITHUB_SHA::8}\`._"
+          fi
+          {
+            echo "note<<RANGE_NOTE_EOF"
+            echo "$range_note"
+            echo "RANGE_NOTE_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update dev release
         env:
@@ -87,7 +111,9 @@ jobs:
 
           \`\`\`bash
           pip install --pre franky-control --extra-index-url ${pages_url}/${index_path}/libfranka-<libfranka version>/
-          \`\`\`" \
+          \`\`\`
+
+          ${{ steps.range.outputs.note }}" \
             wheels/*.whl
 
   update-package-index:
