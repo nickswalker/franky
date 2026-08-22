@@ -3,11 +3,11 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="⚙️ Installation" href="getting-started/installation.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="⚙️ C++ API" href="api/cpp.html">
         <link rel="prefetch" href="_static/logo.svg" as="image">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>franky 2.0.0</title>
+        <title>🛠️ Development - franky 2.0.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
@@ -163,7 +163,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="#"><div class="brand">franky 2.0.0</div></a>
+      <a href="index.html"><div class="brand">franky 2.0.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
   <aside class="sidebar-drawer">
     <div class="sidebar-container">
       
-      <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   <div class="sidebar-logo-container">
     <img class="sidebar-logo" src="_static/logo.svg" alt="Logo"/>
   </div>
@@ -337,8 +337,8 @@
 <li class="toctree-l1"><a class="reference internal" href="api/cpp.html">⚙️ C++ API</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Development</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="development.html">🛠️ Development</a></li>
+<ul class="current">
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">🛠️ Development</a></li>
 </ul>
 
 </div>
@@ -359,12 +359,12 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="https://github.com/TimSchneider42/franky/blob/master/doc/index.md?plain=true" title="View this page">
+  <a class="muted-link" href="https://github.com/TimSchneider42/franky/blob/master/doc/development.md?plain=true" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
 </div><div class="edit-this-page">
-  <a class="muted-link" href="https://github.com/TimSchneider42/franky/edit/master/doc/index.md" rel="edit" title="Edit this page">
+  <a class="muted-link" href="https://github.com/TimSchneider42/franky/edit/master/doc/development.md" rel="edit" title="Edit this page">
     <svg><use href="#svg-pencil"></use></svg>
     <span class="visually-hidden">Edit this page</span>
   </a>
@@ -381,71 +381,130 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="franky-high-level-control-library-for-franka-robots">
-<h1>franky — High-Level Control Library for Franka Robots<a class="headerlink" href="#franky-high-level-control-library-for-franka-robots" title="Link to this heading">¶</a></h1>
-<p>franky is a high-level control library for Franka robots, offering Python and C++ support.
-By providing a high-level control interface, franky eliminates the need for strict real-time programming at 1 kHz,
-making control from non-real-time environments, such as Python programs, feasible.
-Instead of relying on low-level control commands, franky expects high-level position or velocity targets and
-uses <a class="reference external" href="https://github.com/pantor/ruckig">Ruckig</a> to plan time-optimal trajectories in real-time.</p>
-<p>Although Python does not provide real-time guarantees, franky strives to maintain as much real-time control as possible.
-Motions can be preempted at any moment, prompting franky to re-plan trajectories on the fly.
-To handle unforeseen situations — such as unexpected contact with the environment — franky includes a reaction system
-that allows for updating motion commands dynamically.
-Furthermore, most non-real-time functionality of
-<a class="reference external" href="https://frankarobotics.github.io/docs/doc/libfranka/docs/index.html">libfranka</a>, such as gripper control, is made
-directly available in Python.</p>
-<p>Ready to go? Follow the <a class="reference internal" href="getting-started/installation.html"><span class="std std-doc">installation instructions</span></a> and check out
-the <a class="reference internal" href="guide/index.html"><span class="std std-doc">guide</span></a> for an introduction.
-If you do not have a robot at hand, you can also try the <a class="reference internal" href="guide/simulation.html"><span class="std std-doc">simulation</span></a> first.</p>
-<section id="license">
-<h2>📜 License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h2>
-<p>Starting with version 2.0.0, franky is licensed under the
-<a class="reference external" href="https://github.com/TimSchneider42/franky/blob/master/LICENSE">MIT License</a>.
-Versions prior to 2.0.0 were released under the LGPL v3.0 and remain available under that license.</p>
-<p>The Python docstrings of the <code class="docutils literal notranslate"><span class="pre">franka.*</span></code> entities are extracted from the headers of
-<a class="reference external" href="https://github.com/frankaemika/libfranka">libfranka</a>, Copyright (c) Franka Robotics GmbH, which is licensed under the
-<a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>.</p>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="getting-started/installation.html">⚙️ Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting-started/docker.html">🐋 Using Docker</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting-started/faq.html">❓ FAQ</a></li>
-</ul>
+          <section class="tex2jax_ignore mathjax_ignore" id="development">
+<h1>🛠️ Development<a class="headerlink" href="#development" title="Link to this heading">¶</a></h1>
+<section id="building-franky-from-source">
+<h2>Building franky from Source<a class="headerlink" href="#building-franky-from-source" title="Link to this heading">¶</a></h2>
+<p>franky is based on <a class="reference external" href="https://github.com/frankarobotics/libfranka">libfranka</a>, <a class="reference external" href="https://eigen.tuxfamily.org">Eigen</a> for
+transformation calculations and <a class="reference external" href="https://github.com/pybind/pybind11">pybind11</a> for the Python bindings.
+As the Franka is sensitive to acceleration discontinuities, it requires jerk-constrained motion generation, for which
+franky uses the <a class="reference external" href="https://ruckig.com">Ruckig</a> community version for Online Trajectory Generation (OTG).</p>
+<p>After installing the dependencies (the exact versions can be found <a class="reference internal" href="#tested-dependency-versions">below</a>), you can build
+and install franky via</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--recurse-submodules<span class="w"> </span>git@github.com:timschneider42/franky.git
+<span class="nb">cd</span><span class="w"> </span>franky
+mkdir<span class="w"> </span>-p<span class="w"> </span>build
+<span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span>..
+make
+make<span class="w"> </span>install
+</pre></div>
 </div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="guide/index.html">📚 Guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="guide/geometry.html">🧮 Geometry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/robot.html">🤖 Robot</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/trajectory-control.html">🏃‍♂️ Trajectory Control</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/impedance-control.html">🫨 Impedance Control</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/torque-control.html">💪 Torque Control</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/executing-motions.html">🎬 Executing Motions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/reactions.html">⚡ Real-Time Reactions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/realtime-motions.html">⏱️ Real-Time Motions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/gripper.html">👌 Gripper</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/desk.html">🖳 Accessing the Desk API</a></li>
-<li class="toctree-l2"><a class="reference internal" href="guide/simulation.html">🖥️ Simulating the Robot</a></li>
-</ul>
-</li>
-</ul>
+<p>To use franky, you can also include it as a subproject in your parent CMake via <code class="docutils literal notranslate"><span class="pre">add_subdirectory(franky)</span></code> and then
+<code class="docutils literal notranslate"><span class="pre">target_link_libraries(&lt;target&gt;</span> <span class="pre">franky)</span></code>.</p>
+<p>If you need only the Python module, you can install franky via</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>.
+</pre></div>
 </div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="api/python.html">🐍 Python API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="api/cpp.html">⚙️ C++ API</a></li>
-</ul>
+<p>Make sure that the built library <code class="docutils literal notranslate"><span class="pre">_franky.cpython-3**-****-linux-gnu.so</span></code> is in the Python path, e.g. by adjusting
+<code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code> accordingly.</p>
+<section id="building-franky-with-docker">
+<h3>Building franky with Docker<a class="headerlink" href="#building-franky-with-docker" title="Link to this heading">¶</a></h3>
+<p>For building franky and its wheels, we provide another Docker container that can also be launched using
+docker-compose:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>compose<span class="w"> </span>build<span class="w"> </span>franky-build
+docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>franky-build<span class="w"> </span>run-tests<span class="w">  </span><span class="c1"># To run the tests</span>
+docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>franky-build<span class="w"> </span>build-wheels<span class="w">  </span><span class="c1"># To build wheels for all supported python versions</span>
+</pre></div>
 </div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Development</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="development.html">🛠️ Development</a></li>
-</ul>
+<p>The built wheels are placed in <code class="docutils literal notranslate"><span class="pre">build/dist/</span></code> and can be installed via</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--no-index<span class="w"> </span>--find-links<span class="o">=</span>./build/dist<span class="w"> </span>franky-control
+</pre></div>
 </div>
+</section>
+</section>
+<section id="tested-dependency-versions">
+<h2>Tested Dependency Versions<a class="headerlink" href="#tested-dependency-versions" title="Link to this heading">¶</a></h2>
+<p>franky is currently tested against the following versions</p>
+<ul class="simple">
+<li><p>libfranka &gt;=0.7.1</p></li>
+<li><p>Eigen 3.4.0</p></li>
+<li><p>Pybind11 3.0.4</p></li>
+<li><p>POCO 1.12.5p2</p></li>
+<li><p>Pinocchio 3.4.0</p></li>
+<li><p>Ruckig 0.17.3</p></li>
+<li><p>Python &gt;=3.7</p></li>
+<li><p>Catch2 2.13.8 (for testing only)</p></li>
+</ul>
+</section>
+<section id="regenerating-the-python-docstrings">
+<h2>Regenerating the Python Docstrings<a class="headerlink" href="#regenerating-the-python-docstrings" title="Link to this heading">¶</a></h2>
+<p>The docstrings of the Python bindings are extracted from the doxygen comments in the C++ headers
+with <a class="reference external" href="https://github.com/pybind/pybind11_mkdoc">pybind11_mkdoc</a> and are checked in as
+<code class="docutils literal notranslate"><span class="pre">python/docstrings.hpp</span></code>, so regular builds do not depend on pybind11_mkdoc. After changing doc
+comments in the headers, regenerate this file with the <code class="docutils literal notranslate"><span class="pre">franky-docstrings</span></code> CMake target, which uses
+the include directories and version defines of the configured build:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libclang-dev
+pip<span class="w"> </span>install<span class="w"> </span>pybind11_mkdoc<span class="w"> </span><span class="s2">"clang~=14.0"</span><span class="w">  </span><span class="c1"># the clang package version should match libclang</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>franky-docstrings
+</pre></div>
+</div>
+</section>
+<section id="building-the-documentation">
+<h2>Building the Documentation<a class="headerlink" href="#building-the-documentation" title="Link to this heading">¶</a></h2>
+<p>The documentation is built with <a class="reference external" href="https://www.sphinx-doc.org/">Sphinx</a>.
+Generating the Python API reference requires franky to be importable, so install it (e.g. a wheel or a source build)
+first:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>franky-control<span class="w">  </span><span class="c1"># or: pip install .</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>doc/requirements.txt
+<span class="nv">VERSION</span><span class="o">=</span><span class="k">$(</span>cat<span class="w"> </span>VERSION<span class="k">)</span><span class="w"> </span>sphinx-build<span class="w"> </span>-b<span class="w"> </span>html<span class="w"> </span>doc<span class="w"> </span>doc/_build/html
+</pre></div>
+</div>
+</section>
+<section id="differences-to-frankx">
+<h2>Differences to frankx<a class="headerlink" href="#differences-to-frankx" title="Link to this heading">¶</a></h2>
+<p>franky started originally as a fork of <a class="reference external" href="https://github.com/pantor/frankx">frankx</a>, though both codebase and
+functionality differ substantially from frankx by now.
+Aside from bug fixes and general performance improvements, franky provides the following new features/improvements:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="guide/realtime-motions.html"><span class="std std-doc">Motions can be updated asynchronously.</span></a></p></li>
+<li><p><a class="reference internal" href="guide/reactions.html"><span class="std std-doc">Reactions allow for the registration of callbacks instead of just printing to stdout when fired.</span></a></p></li>
+<li><p><a class="reference internal" href="guide/executing-motions.html#motion-callbacks"><span class="std std-ref">Motions allow for the registration of callbacks for profiling.</span></a></p></li>
+<li><p><a class="reference internal" href="guide/robot.html#robot-state"><span class="std std-ref">The robot state is also available during control.</span></a></p></li>
+<li><p>A larger part of the libfranka API is exposed to python (e.g., <code class="docutils literal notranslate"><span class="pre">setCollisionBehavior</span></code>, <code class="docutils literal notranslate"><span class="pre">setJointImpedance</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">setCartesianImpedance</span></code>).</p></li>
+<li><p>Cartesian motion generation handles boundaries in Euler angles properly.</p></li>
+<li><p><a class="reference internal" href="guide/trajectory-control.html"><span class="std std-doc">Motions in both joint and Cartesian space support waypoints with target velocities.</span></a></p></li>
+<li><p>franky supports <a class="reference internal" href="guide/trajectory-control.html#joint-velocity-control"><span class="std std-ref">joint velocity control</span></a>
+and <a class="reference internal" href="guide/trajectory-control.html#cartesian-velocity-control"><span class="std std-ref">cartesian velocity control</span></a>.</p></li>
+<li><p><a class="reference internal" href="guide/impedance-control.html"><span class="std std-doc">franky provides client-side joint and Cartesian impedance controllers</span></a>, including
+tracking variants whose references and gains can be updated in real time.</p></li>
+<li><p><a class="reference internal" href="guide/torque-control.html"><span class="std std-doc">Joint torques can be commanded directly</span></a> with <code class="docutils literal notranslate"><span class="pre">SimpleTorqueMotion</span></code>.</p></li>
+<li><p><a class="reference internal" href="guide/robot.html#robot-state"><span class="std std-ref">The robot’s kinematics model is accessible</span></a> for computing forward kinematics and
+Jacobians, and the robot’s URDF model can be retrieved.</p></li>
+<li><p><a class="reference internal" href="guide/desk.html"><span class="std std-doc">The Franka Desk API can be accessed programmatically</span></a>, e.g., to unlock the brakes, enable the FCI,
+or run the safety self-test.</p></li>
+<li><p><a class="reference internal" href="guide/simulation.html"><span class="std std-doc">franky can be used with the franky-sim simulator</span></a>, a drop-in replacement for the real robot.</p></li>
+<li><p><a class="reference internal" href="guide/geometry.html"><span class="std std-doc">The signature of <code class="docutils literal notranslate"><span class="pre">Affine</span></code> changed.</span></a> <code class="docutils literal notranslate"><span class="pre">Affine</span></code> does not handle elbow positions anymore.
+Instead, a new class <code class="docutils literal notranslate"><span class="pre">RobotPose</span></code> stores both the end-effector pose and optionally the elbow position.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">MotionData</span></code> class does not exist anymore.
+Instead, reactions and other settings moved to <code class="docutils literal notranslate"><span class="pre">Motion</span></code>.</p></li>
+<li><p><a class="reference internal" href="guide/reactions.html"><span class="std std-doc">The <code class="docutils literal notranslate"><span class="pre">Measure</span></code> class allows for arithmetic operations.</span></a></p></li>
+<li><p>Exceptions caused by libfranka are raised properly instead of being printed to stdout.</p></li>
+<li><p><a class="reference internal" href="getting-started/installation.html"><span class="std std-doc">We provide wheels for a wide range of libfranka versions</span></a>, supporting both the
+Franka Research 3 and the older Franka Panda.</p></li>
+<li><p>The dynamics limits are not hard-coded anymore but can be <a class="reference internal" href="guide/robot.html"><span class="std std-doc">set for each robot instance</span></a>.</p></li>
+</ul>
+</section>
+<section id="contributing">
+<h2>Contributing<a class="headerlink" href="#contributing" title="Link to this heading">¶</a></h2>
+<p>If you wish to contribute to this project, you are welcome to create a pull request.
+Please run the <a class="reference external" href="https://pre-commit.com/">pre-commit</a> hooks before submitting your pull request.
+To install the pre-commit hooks, run:</p>
+<ol class="arabic simple">
+<li><p><a class="reference external" href="https://pre-commit.com/#install">Install pre-commit</a></p></li>
+<li><p>Install the Git hooks by running <code class="docutils literal notranslate"><span class="pre">pre-commit</span> <span class="pre">install</span></code> or, alternatively, run <code class="docutils literal notranslate"><span class="pre">pre-commit</span> <span class="pre">run</span> <span class="pre">--all-files</span></code> manually.</p></li>
+</ol>
 </section>
 </section>
 
@@ -454,16 +513,18 @@ Versions prior to 2.0.0 were released under the LGPL v3.0 and remain available u
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="getting-started/installation.html">
+          
+          <a class="prev-page" href="api/cpp.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
-                  <span>Next</span>
+                  <span>Previous</span>
                 </div>
-                <div class="title">⚙️ Installation</div>
+                
+                <div class="title">⚙️ C++ API</div>
+                
               </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
@@ -494,10 +555,16 @@ Versions prior to 2.0.0 were released under the LGPL v3.0 and remain available u
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">franky — High-Level Control Library for Franka Robots</a><ul>
-<li><a class="reference internal" href="#license">📜 License</a><ul>
+<li><a class="reference internal" href="#">🛠️ Development</a><ul>
+<li><a class="reference internal" href="#building-franky-from-source">Building franky from Source</a><ul>
+<li><a class="reference internal" href="#building-franky-with-docker">Building franky with Docker</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#tested-dependency-versions">Tested Dependency Versions</a></li>
+<li><a class="reference internal" href="#regenerating-the-python-docstrings">Regenerating the Python Docstrings</a></li>
+<li><a class="reference internal" href="#building-the-documentation">Building the Documentation</a></li>
+<li><a class="reference internal" href="#differences-to-frankx">Differences to frankx</a></li>
+<li><a class="reference internal" href="#contributing">Contributing</a></li>
 </ul>
 </li>
 </ul>
