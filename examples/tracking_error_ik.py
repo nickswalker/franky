@@ -1,8 +1,9 @@
-"""Lissajous tracking error benchmark using IK-backed joint impedance control.
+"""Lissajous tracking error benchmark using analytical IK and joint impedance control.
 
-Mirrors tracking_error.py but drives the same trajectory through a damped
-least-squares IK solver streaming to a JointImpedanceTracker.  Run both
-scripts with identical --speed / --duration flags to compare controllers.
+Mirrors tracking_error.py but converts each Cartesian sample with franky's closed-form
+analytical IK solver and streams the resulting joint trajectory to a
+JointImpedanceTracker. Run both scripts with identical --speed / --duration flags to
+compare controllers.
 """
 
 from argparse import ArgumentParser
@@ -19,6 +20,13 @@ from franky import (
     JointMotion,
     ReferenceType,
     Robot,
+)
+from franky.kinematics import (
+    FR3_JOINT_LIMITS,
+    PANDA_JOINT_LIMITS,
+    IKOptions,
+    RedundancyParameter,
+    inverse_kinematics_nearest,
 )
 
 _DEFAULT_STIFFNESS = np.array([320.0, 320.0, 320.0, 320.0, 120.0, 120.0, 60.0])
@@ -60,73 +68,11 @@ def rotation_error_rad(R_target: np.ndarray, R_current: np.ndarray) -> float:
 
 
 def get_joint_limits(robot: Robot):
-    if "fr3" in robot.model_urdf.lower():
-        return (
-            np.array([-2.9007, -1.8361, -2.9007, -3.0770, -2.8763, 0.4398, -3.0508]),
-            np.array([2.9007, 1.8361, 2.9007, -0.1169, 2.8763, 4.6216, 3.0508]),
-        )
     return (
-        np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]),
-        np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]),
+        FR3_JOINT_LIMITS
+        if "fr3" in robot.model_urdf.lower()
+        else PANDA_JOINT_LIMITS
     )
-
-
-class DampedLeastSquaresIK:
-    def __init__(
-        self,
-        robot: Robot,
-        lower_joint_limits: np.ndarray,
-        upper_joint_limits: np.ndarray,
-        *,
-        damping: float = 0.05,
-        max_iterations: int = 20,
-        max_step: float = 0.05,
-        position_tolerance: float = 0.002,
-        orientation_tolerance: float = 0.03,
-    ):
-        self.robot = robot
-        self.lower_joint_limits = lower_joint_limits
-        self.upper_joint_limits = upper_joint_limits
-        self.damping = damping
-        self.max_iterations = max_iterations
-        self.max_step = max_step
-        self.position_tolerance = position_tolerance
-        self.orientation_tolerance = orientation_tolerance
-
-    def solve(self, target: Affine, seed: np.ndarray):
-        q = seed.copy()
-        target_matrix = np.asarray(target.matrix, dtype=float)
-        target_position = target_matrix[:3, 3]
-        target_rotation = target_matrix[:3, :3]
-        state = self.robot.state
-
-        for _ in range(self.max_iterations):
-            pose = self.robot.model.pose(Frame.EndEffector, q, state.F_T_EE, state.EE_T_K)
-            pose_matrix = np.asarray(pose.matrix, dtype=float)
-            position_error = target_position - pose_matrix[:3, 3]
-            rotation_error = so3_log(target_rotation @ pose_matrix[:3, :3].T)
-            error = np.concatenate([position_error, rotation_error])
-
-            if (
-                np.linalg.norm(position_error) < self.position_tolerance
-                and np.linalg.norm(rotation_error) < self.orientation_tolerance
-            ):
-                return q, True, error
-
-            jacobian = np.asarray(
-                self.robot.model.zero_jacobian(
-                    Frame.EndEffector, q, state.F_T_EE, state.EE_T_K
-                ),
-                dtype=float,
-            )
-            lhs = jacobian @ jacobian.T + (self.damping**2) * np.eye(6)
-            dq = jacobian.T @ np.linalg.solve(lhs, error)
-            dq_norm = float(np.linalg.norm(dq))
-            if dq_norm > self.max_step:
-                dq *= self.max_step / dq_norm
-            q = np.clip(q + dq, self.lower_joint_limits, self.upper_joint_limits)
-
-        return q, False, error
 
 
 if __name__ == "__main__":
@@ -196,7 +142,9 @@ if __name__ == "__main__":
         torque_thresholds=[35.0, 35.0, 35.0, 35.0, 35.0, 35.0, 35.0],
         force_thresholds=[60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
     )
-    lower_joint_limits, upper_joint_limits = get_joint_limits(robot)
+    lower_joint_limits, upper_joint_limits = (
+        np.asarray(limit, dtype=float) for limit in get_joint_limits(robot)
+    )
 
     # --- move to start configuration -----------------------------------------
     print("Moving to start joint configuration …")
@@ -240,11 +188,9 @@ if __name__ == "__main__":
         else None
     )
 
-    # --- precompute IK trajectory (with disk cache) --------------------------
+    # --- precompute analytical IK trajectory (with disk cache) ----------------
     import hashlib
     from pathlib import Path
-
-    ik = DampedLeastSquaresIK(robot, lower_joint_limits, upper_joint_limits)
 
     # Wall-clock sample count; trajectory time is remapped through sinusoidal
     # ease-in/ease-out so ds/dt=0 at both endpoints.
@@ -252,20 +198,30 @@ if __name__ == "__main__":
     n = len(t_wall)
     t_norm = np.clip(t_wall / duration, 0.0, 1.0)
     s_norm = t_norm - np.sin(2.0 * np.pi * t_norm) / (2.0 * np.pi)
-    t_samples = t_offset + s_norm * duration          # trajectory times fed to lissajous
+    t_samples = t_offset + s_norm * duration  # trajectory times fed to lissajous
     # Chain-rule factor mapping f'(t_traj) to the Cartesian velocity x'(t):
     # x'(t) = f'(t_traj) · d(t_traj)/dt, where d(t_traj)/dt = 1 - cos(2π·t_norm).
     dtraj_dt = 1.0 - np.cos(2.0 * np.pi * t_norm)
 
     state = robot.state
-    _jac_damping_sq = 0.05 ** 2
+    ik_options = IKOptions(joint_limits=(lower_joint_limits, upper_joint_limits))
+    ik_max_distance = 0.15  # [rad] reject branch switches during path tracking
 
     target_positions = np.array([lissajous(t, base_freq)[0] for t in t_samples])
-    _cache_key = hashlib.sha256(target_positions.tobytes()).hexdigest()[:20]
+    cache_hash = hashlib.sha256(b"analytical-ik-q7-v1")
+    for cache_array in (
+        target_positions,
+        np.asarray(orientation, dtype=float),
+        np.asarray(state.F_T_EE.matrix, dtype=float),
+        lower_joint_limits,
+        upper_joint_limits,
+    ):
+        cache_hash.update(np.asarray(cache_array).tobytes())
+    _cache_key = cache_hash.hexdigest()[:20]
     _cache_path = Path("data/ik_cache") / f"{_cache_key}.npz"
 
     if _cache_path.exists():
-        print(f"Loading cached IK trajectory ({_cache_key}) …")
+        print(f"Loading cached analytical IK trajectory ({_cache_key}) …")
         _cache = np.load(_cache_path)
         q_traj = _cache["q_traj"]
         dq_traj = _cache["dq_traj"]
@@ -275,47 +231,79 @@ if __name__ == "__main__":
         q_traj = np.zeros((n, 7))
         ik_failures = 0
 
-        print(f"Precomputing IK for {n} samples …")
+        print(f"Precomputing analytical IK for {n} samples …")
+        # Hold the seed's q7 value while following the nearest analytical branch.
         q_cur = q_seed.copy()
         ik_trans_errors = []
         ik_rot_errors = []
         for i, t in enumerate(t_samples):
             target_pos = target_positions[i]
             target_pose = Affine(target_pos, orientation)
-            q_cur, success, _ = ik.solve(target_pose, q_cur)
-            if not success:
+            q_target = inverse_kinematics_nearest(
+                target_pose,
+                q_seed=q_cur,
+                f_t_ee=state.F_T_EE,
+                options=ik_options,
+                parameter=RedundancyParameter.Q7,
+                max_distance=ik_max_distance,
+            )
+            if q_target is None:
                 ik_failures += 1
+            else:
+                q_cur = np.asarray(q_target, dtype=float)
             q_traj[i] = q_cur
 
-            fk_pose = robot.model.pose(Frame.EndEffector, q_cur, state.F_T_EE, state.EE_T_K)
+            fk_pose = robot.model.pose(
+                Frame.EndEffector, q_cur, state.F_T_EE, state.EE_T_K
+            )
             fk_mat = np.asarray(fk_pose.matrix, dtype=float)
             target_mat = np.asarray(target_pose.matrix, dtype=float)
-            ik_trans_errors.append(np.linalg.norm(target_pos - fk_mat[:3, 3]) * 1000.0)
-            ik_rot_errors.append(np.degrees(rotation_error_rad(target_mat[:3, :3], fk_mat[:3, :3])))
+            ik_trans_errors.append(
+                np.linalg.norm(target_pos - fk_mat[:3, 3]) * 1000.0
+            )
+            ik_rot_errors.append(
+                np.degrees(
+                    rotation_error_rad(target_mat[:3, :3], fk_mat[:3, :3])
+                )
+            )
 
         if ik_failures:
-            print(f"  Warning: IK did not converge for {ik_failures}/{n} samples")
-        print(f"  IK theoretical translational error : {float(np.mean(ik_trans_errors)):.2f} mm")
-        print(f"  IK theoretical rotational error    : {float(np.mean(ik_rot_errors)):.4f} deg")
+            print(f"  Warning: IK failed for {ik_failures}/{n} samples")
+        print(
+            f"  IK theoretical translational error : "
+            f"{float(np.mean(ik_trans_errors)):.2f} mm"
+        )
+        print(
+            f"  IK theoretical rotational error    : "
+            f"{float(np.mean(ik_rot_errors)):.4f} deg"
+        )
 
-        print("Computing analytic joint velocities (J^+ * v_cartesian) …")
+        print("Computing analytical joint velocities (J^+ * v_cartesian) …")
         dq_traj = np.zeros((n, 7))
         for i, (t, q) in enumerate(zip(t_samples, q_traj)):
             _, v_linear = lissajous(t, base_freq)
             v_6d = np.concatenate([v_linear * dtraj_dt[i], np.zeros(3)])
             J = np.asarray(
-                robot.model.zero_jacobian(Frame.EndEffector, q, state.F_T_EE, state.EE_T_K),
+                robot.model.zero_jacobian(
+                    Frame.EndEffector, q, state.F_T_EE, state.EE_T_K
+                ),
                 dtype=float,
             )
-            lhs = J @ J.T + _jac_damping_sq * np.eye(6)
+            lhs = J @ J.T + (0.05**2) * np.eye(6)
             dq_traj[i] = J.T @ np.linalg.solve(lhs, v_6d)
 
         ddq_traj = np.zeros_like(dq_traj)
         ddq_traj[:-1] = np.diff(dq_traj, axis=0) / _PERIOD
 
         _cache_path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(_cache_path, q_traj=q_traj, dq_traj=dq_traj, ddq_traj=ddq_traj, ik_failures=np.array(ik_failures))
-        print(f"  IK trajectory cached → {_cache_path}")
+        np.savez_compressed(
+            _cache_path,
+            q_traj=q_traj,
+            dq_traj=dq_traj,
+            ddq_traj=ddq_traj,
+            ik_failures=np.array(ik_failures),
+        )
+        print(f"  Analytical IK trajectory cached → {_cache_path}")
 
     tau_ff_traj = np.zeros((n, 7))
     if args.inertial_ff:
