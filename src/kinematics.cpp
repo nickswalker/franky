@@ -127,6 +127,29 @@ Affine forwardKinematics(const Vector7d &q, const Affine &F_T_EE) {
   return Affine{o_t_flange} * F_T_EE;
 }
 
+Jacobian jacobian(const Vector7d &q, const Affine &F_T_EE) {
+  // nanoGeoFIK hands back J^T: seven rows of [omega; v], the linear part referenced to the origin
+  // of the requested frame. libfranka's Model::zeroJacobian is 6x7 with the linear rows first, so
+  // the transpose and the block swap happen here rather than leaving callers a second convention.
+  const std::array<std::array<double, 6>, 7> flange_jacobian = J_from_q(toStdD<7>(q), Frame::Flange);
+  Jacobian result;
+  for (Eigen::Index i = 0; i < 7; ++i) {
+    const std::array<double, 6> &column = flange_jacobian[static_cast<size_t>(i)];
+    result.block<3, 1>(0, i) = Eigen::Map<const Eigen::Vector3d>(column.data() + 3);
+    result.block<3, 1>(3, i) = Eigen::Map<const Eigen::Vector3d>(column.data());
+  }
+
+  // Move the reference point from the flange origin to the end-effector origin. Each column is
+  // v_i = z_i x (p - p_i), so shifting p by d adds z_i x d = omega_i x d. The orientation of
+  // F_T_EE never enters, which also means a purely rotated end-effector costs nothing here.
+  if (!F_T_EE.translation().isZero()) {
+    const Eigen::Matrix4d o_t_flange = franka_fk(toStdD<7>(q), Frame::Flange);
+    const Eigen::Vector3d flange_to_ee = o_t_flange.topLeftCorner<3, 3>() * F_T_EE.translation();
+    for (Eigen::Index i = 0; i < 7; ++i) result.block<3, 1>(0, i) += result.block<3, 1>(3, i).cross(flange_to_ee);
+  }
+  return result;
+}
+
 double swivelAngle(const Vector7d &q) { return franka_swivel(toStdD<7>(q)); }
 
 // Reconcile franky's end-effector frame with nanoGeoFIK's fixed EndEffector frame. Right-multiplying a
@@ -223,8 +246,9 @@ static size_t inverseKinematicsPrepared(
     if (!q.allFinite()) continue;
     if (target.has_value() && !reachesPose(q, *target, F_T_EE)) continue;
     if (options.redundancy_tolerance > 0.0 &&
-        !holdsRedundancyValue(q, redundancy_value, parameter, options.redundancy_tolerance))
+        !holdsRedundancyValue(q, redundancy_value, parameter, options.redundancy_tolerance)) {
       continue;
+    }
     out_solutions[valid_count++] = q;
   }
   return valid_count;
@@ -333,8 +357,10 @@ static std::optional<Vector7d> inverseKinematicsNearestPrepared(
   for (unsigned int i = 0; i < valid_count; ++i) {
     const Vector7d q = toEigenD<7>(qsols[candidates[i].index]);
     if (target.has_value() && !reachesPose(q, *target, F_T_EE)) continue;
-    if (options.redundancy_tolerance > 0.0 && !holdsRedundancyValue(q, value, parameter, options.redundancy_tolerance))
+    if (options.redundancy_tolerance > 0.0 &&
+        !holdsRedundancyValue(q, value, parameter, options.redundancy_tolerance)) {
       continue;
+    }
     return q;
   }
 

@@ -174,6 +174,25 @@ struct IKOptions {
 [[nodiscard]] Affine forwardKinematics(const Vector7d &q, const Affine &F_T_EE = Affine::Identity());
 
 /**
+ * @brief The analytical geometric Jacobian of the end-effector frame, expressed in the base frame.
+ *
+ * Maps joint velocity to the end-effector twist, (v, omega) = J * qdot, with the linear rows first.
+ * That is the same quantity, frame and row order as Model::zeroJacobian(franka::Frame::kEndEffector,
+ * ...), but like forwardKinematics it needs no franka::Model (and hence no robot connection) and uses
+ * the nominal Franka geometry, so it does not account for per-robot calibration.
+ *
+ * Only the translation of @p F_T_EE affects the result: a base-frame Jacobian depends on where the
+ * end-effector origin is, not on how the frame is oriented. For the body Jacobian, rotate both 3x7
+ * blocks into the end-effector frame with the transpose of forwardKinematics(q, F_T_EE).rotation().
+ *
+ * @param q      Joint angles [rad].
+ * @param F_T_EE Transformation from the flange to the end-effector frame. The default (identity)
+ *               returns the flange Jacobian.
+ * @return The 6x7 Jacobian: rows 0-2 map to linear velocity [m/s], rows 3-5 to angular velocity [rad/s].
+ */
+[[nodiscard]] Jacobian jacobian(const Vector7d &q, const Affine &F_T_EE = Affine::Identity());
+
+/**
  * @brief The swivel (arm) angle of a joint configuration [rad] using stereographic SEW.
  *
  * This is the inverse of resolving the redundancy by RedundancyParameter::kSwivel:

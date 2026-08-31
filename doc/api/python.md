@@ -76,6 +76,7 @@ See the [Analytical Kinematics](../guide/kinematics.md) chapter of the guide for
    IKOptions
    RedundancyParameter
    forward_kinematics
+   jacobian
    swivel_angle
    inverse_kinematics
    inverse_kinematics_nearest

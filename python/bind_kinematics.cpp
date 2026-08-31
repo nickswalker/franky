@@ -25,8 +25,9 @@ using PyDoubleArray = py::array_t<double, py::array::c_style | py::array::forcec
 std::vector<Affine> toAffines(const py::object &targets) {
   if (py::isinstance<py::array>(targets)) {
     auto array = PyDoubleArray::ensure(targets);
-    if (!array || array.ndim() != 3 || array.shape(1) != 4 || array.shape(2) != 4)
+    if (!array || array.ndim() != 3 || array.shape(1) != 4 || array.shape(2) != 4) {
       throw std::invalid_argument("o_t_ee array must have shape (N, 4, 4) and a numeric dtype");
+    }
     const auto n = static_cast<size_t>(array.shape(0));
     const double *data = array.data();
     std::vector<Affine> result;
@@ -44,8 +45,9 @@ std::vector<Affine> toAffines(const py::object &targets) {
 // Seeds, given as one (7,) configuration shared by every target or as (N, 7).
 std::vector<Vector7d> toSeeds(const py::object &q_seed) {
   auto array = PyDoubleArray::ensure(q_seed);
-  if (!array || (array.ndim() != 1 && array.ndim() != 2) || array.shape(array.ndim() - 1) != 7)
+  if (!array || (array.ndim() != 1 && array.ndim() != 2) || array.shape(array.ndim() - 1) != 7) {
     throw std::invalid_argument("q_seed must have shape (7,) or (N, 7)");
+  }
   const auto n = static_cast<size_t>(array.ndim() == 1 ? 1 : array.shape(0));
   const double *data = array.data();
   std::vector<Vector7d> result;
@@ -164,6 +166,27 @@ void bind_kinematics(py::module &m) {
       "    f_t_ee: Transform from flange to end-effector frame. Default (identity) returns the flange pose.\n\n"
       "Returns:\n"
       "    The pose of the end-effector frame relative to the base frame.");
+
+  kinematics.def(
+      "jacobian",
+      &jacobian,
+      "q"_a,
+      py::arg_v("f_t_ee", Affine::Identity(), "Affine()"),
+      "Analytical geometric Jacobian of the end-effector frame, expressed in the base frame (no robot "
+      "connection required).\n\n"
+      "Maps joint velocity to the end-effector twist, (v, omega) = J @ dq, with the linear rows first: the "
+      "same quantity, frame and row order as Model.zero_jacobian(Frame.EndEffector, ...), but computed from "
+      "the nominal Franka geometry, so it does not account for per-robot calibration.\n\n"
+      "Only the translation of f_t_ee affects the result: a base-frame Jacobian depends on where the "
+      "end-effector origin is, not on how the frame is oriented. For the body Jacobian, rotate both halves "
+      "into the end-effector frame with the transpose of forward_kinematics(q, f_t_ee).matrix[:3, :3].\n\n"
+      "Args:\n"
+      "    q: Joint angles [rad].\n"
+      "    f_t_ee: Transform from flange to end-effector frame. Default (identity) returns the flange "
+      "Jacobian.\n\n"
+      "Returns:\n"
+      "    A (6, 7) array whose rows 0-2 map joint velocity to linear velocity [m/s] and whose rows 3-5 map "
+      "it to angular velocity [rad/s].");
 
   kinematics.def(
       "swivel_angle",
